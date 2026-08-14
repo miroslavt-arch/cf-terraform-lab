@@ -19,13 +19,14 @@ repos:
     hooks:
       - id: forbid-state-and-secret-files
         name: forbid tfstate / tfvars / .terraform / env files
-        entry: bash -c 'for f in "$@"; do case "$f" in *.tfstate|*.tfstate.*|*.tfvars|*.tfvars.json|*.tfplan|.env|*.pem|*.key) echo "BLOCKED secret-risk file: $f"; exit 1;; *".terraform/"*) echo "BLOCKED .terraform dir file: $f"; exit 1;; esac; done' --
+        entry: bash scripts/hooks/forbid-secret-files.sh
         language: system
 
       - id: forbid-token-patterns
         name: grep staged files for credential patterns
-        entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; if grep -nE "(CLOUDFLARE|CF)_API_(TOKEN|KEY)[[:space:]]*=[[:space:]]*\"?[A-Za-z0-9_-]{30,}|AWS_SECRET_ACCESS_KEY[[:space:]]*=[[:space:]]*\"?[A-Za-z0-9/+=]{30,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}" "$f"; then echo "BLOCKED credential-looking content in: $f"; rc=1; fi; done; exit $rc' --
+        entry: bash scripts/hooks/forbid-secret-patterns.sh
         language: system
+        exclude: '^scripts/hooks/forbid-secret-patterns\.sh$'
 
       - id: terraform-fmt
         name: terraform fmt

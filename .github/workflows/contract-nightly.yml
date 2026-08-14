@@ -1,0 +1,31 @@
+# Topic 24, tier two — contract tests that touch the REAL lab zone with
+# tftest-prefixed resources and auto-destroy them. Nightly + on demand only;
+# never on PRs (tier one covers those offline).
+name: contract-tests
+
+on:
+  schedule:
+    - cron: "42 2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: tier-two contract tests (real zone, tftest- prefix)
+    runs-on: ubuntu-latest
+    environment: lab-apply          # write token required to create/destroy
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_contract_zone_id: ${{ vars.LAB_ZONE_ID }}
+      TF_VAR_contract_zone_name: ${{ vars.LAB_ZONE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+      - name: run contract tests
+        run: |
+          terraform init -backend=false -input=false
+          terraform test -test-directory=tests/contract

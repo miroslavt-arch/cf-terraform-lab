@@ -11,11 +11,13 @@ locals {
   }
 
   # merge(): overrides win, but only for keys the variable validation let in.
+  # Zones with manage_settings = false contribute NO settings — they consume
+  # the zone without contending for the singleton (v0.2.0).
   zone_settings = merge([
     for zk, z in var.zones : {
       for sk, sv in merge(local.settings_baseline, z.settings_overrides) :
       "${zk}/${sk}" => { zone_id = z.zone_id, setting = sk, value = sv }
-    }
+    } if z.manage_settings
   ]...)
 
   # Flatten zone->records into a single addressable map.

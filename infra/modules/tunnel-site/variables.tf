@@ -29,6 +29,12 @@ variable "service" {
   default     = "http://web:80"
 }
 
+variable "manage_dns" {
+  description = "Whether this module creates the public hostname record. Set false when the caller owns the record — e.g. during secret rotation, where the record must cut over between two live tunnels atomically."
+  type        = bool
+  default     = true
+}
+
 variable "private_cidr" {
   description = "Optional private network route published through the tunnel. null = no private route."
   type        = string

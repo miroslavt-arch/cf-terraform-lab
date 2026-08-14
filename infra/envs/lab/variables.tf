@@ -13,3 +13,21 @@ variable "incident_mode" {
   type        = string
   default     = "none"
 }
+
+variable "enable_tunnel" {
+  description = "Topic 14 gate: create the lab tunnel + public hostname. Off until the tunnel demo, so earlier topics apply a smaller estate."
+  type        = bool
+  default     = false
+}
+
+variable "rotation_generation" {
+  description = "Topic 14 rotation: bump to 2 to create the parallel tunnel (lab-tunnel-g2) alongside the current one. Step 1 of the two-step zero-downtime rotation."
+  type        = number
+  default     = 1
+}
+
+variable "rotation_cutover" {
+  description = "Topic 14 rotation step 2: point the public hostname at the new-generation tunnel. An in-place DNS content update — atomic at the edge, zero downtime."
+  type        = bool
+  default     = false
+}

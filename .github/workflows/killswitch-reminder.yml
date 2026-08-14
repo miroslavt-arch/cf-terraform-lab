@@ -1,0 +1,37 @@
+# Topic 11 — the "you left the kill-switch armed" alarm.
+# Checks REALITY, not intent: asks the Cloudflare API whether any lab_ir_*
+# rule is currently enabled. If yes, this workflow fails loudly on schedule
+# until someone disarms. A failing scheduled job emails the repo owner.
+name: killswitch-reminder
+
+on:
+  schedule:
+    - cron: "0 * * * *"           # hourly while armed; success is silent
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: is the kill-switch still armed?
+    runs-on: ubuntu-latest
+    environment: lab-plan
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PLAN }}
+      LAB_ZONE_ID: ${{ vars.LAB_ZONE_ID }}
+    steps:
+      - name: query the composed ruleset
+        run: |
+          armed=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$LAB_ZONE_ID/rulesets?per_page=50" \
+            | jq -r '.result[] | select(.name=="lab-waf-composed") | .id')
+          if [ -z "$armed" ]; then echo "no composed ruleset deployed — nothing to check"; exit 0; fi
+          enabled=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$LAB_ZONE_ID/rulesets/$armed" \
+            | jq -r '[.result.rules[] | select((.ref // "" | startswith("lab_ir_")) and .enabled == true) | .ref] | join(", ")')
+          if [ -n "$enabled" ]; then
+            echo "::error::KILL-SWITCH ARMED: [$enabled] — if the incident is over, disarm with scripts/arm-killswitch.sh none"
+            exit 1
+          fi
+          echo "kill-switch dark — all lab_ir_* rules disabled, as peacetime should be"

@@ -34,3 +34,9 @@ Thumbs.db
 
 # --- Terraform-docs scratch ---
 .terraform-docs-cache/
+
+# --- Generated during demos (recreated by scripts; never reviewed) ---
+brownfield/records.csv
+brownfield/ruleset.id
+brownfield/adopt/generated_ruleset.tf
+brownfield/adopt/imports_ruleset.tf

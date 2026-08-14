@@ -1,0 +1,19 @@
+# Topic 10 — per-fragment ownership. Each WAF fragment routes to a different
+# (simulated) team; in a real org these would be @org/team-incident etc.
+# On this lab repo every "team" resolves to the instructor account so the
+# review-request mechanics are visible end to end.
+
+# incident-response team owns the kill-switches
+/infra/modules/waf-composed/rules/incident.yaml   @miroslavt-arch
+
+# security team owns the standing security rules
+/infra/modules/waf-composed/rules/security.yaml   @miroslavt-arch
+
+# app team owns only its own fragment
+/infra/modules/waf-composed/rules/app-team.yaml   @miroslavt-arch
+
+# policy is owned by security — the app team cannot loosen its own leash
+/policy/                                          @miroslavt-arch
+
+# workflows and environments are platform-owned
+/.github/                                         @miroslavt-arch

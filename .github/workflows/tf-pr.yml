@@ -1,0 +1,115 @@
+# Topic 20 (plan side) + Topic 24 (tier-one gate).
+# PRs get: offline unit tests -> fmt/validate -> fragment lint -> a real plan
+# with the READ-ONLY token -> plan artifact keyed by commit SHA -> summary
+# comment. The apply workflow later replays EXACTLY this artifact.
+name: tf-pr
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: tf-pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: tier-one tests (offline, no credentials)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+      - name: fmt
+        run: terraform fmt -check -recursive
+      - name: unit tests (mock provider)
+        run: |
+          terraform init -backend=false -input=false
+          terraform test
+
+  lint-fragments:
+    name: conftest on WAF fragments
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: open-policy-agent/setup-opa@v2
+      - name: install conftest
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.69.0/conftest_0.69.0_Linux_x86_64.tar.gz | tar xz conftest
+          sudo mv conftest /usr/local/bin/
+      - name: fragments must pass policy
+        run: conftest test --policy policy infra/modules/waf-composed/rules/
+      - name: bad fixture must FAIL policy (meta-test)
+        run: |
+          if conftest test --policy policy policy/fixtures/bad-app-team.yaml; then
+            echo "::error::bad fixture passed policy — the lint is broken"; exit 1
+          fi
+
+  plan:
+    name: plan (read-only token)
+    needs: [unit, lint-fragments]
+    runs-on: ubuntu-latest
+    environment: lab-plan            # holds ONLY the read-only token
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PLAN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_account_id: ${{ vars.CF_ACCOUNT_ID }}
+      TF_VAR_zone_name: ${{ vars.LAB_ZONE }}
+      TF_VAR_incident_mode: ${{ vars.INCIDENT_MODE || 'none' }}
+    defaults:
+      run:
+        working-directory: infra/envs/lab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+      - name: init (R2 backend)
+        run: terraform init -input=false -backend-config=../../backends/lab.s3.tfbackend
+      - name: plan
+        id: plan
+        run: |
+          terraform plan -input=false -no-color -out=plan-${{ github.event.pull_request.head.sha }}.tfplan \
+            | tee plan.txt
+          terraform show -json plan-${{ github.event.pull_request.head.sha }}.tfplan > plan.json
+      - name: destroy guard (OPA)
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.69.0/conftest_0.69.0_Linux_x86_64.tar.gz | tar xz conftest
+          ./conftest test --policy ../../../policy --namespace destroy_guard plan.json
+      - name: upload plan artifact (keyed by commit SHA)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.event.pull_request.head.sha }}
+          path: |
+            infra/envs/lab/plan-${{ github.event.pull_request.head.sha }}.tfplan
+            infra/envs/lab/plan.txt
+          retention-days: 30
+      - name: comment plan summary on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infra/envs/lab/plan.txt', 'utf8');
+            const tail = plan.length > 60000 ? plan.slice(-60000) : plan;
+            const body = [
+              '### Terraform plan for `' + context.payload.pull_request.head.sha.slice(0,7) + '`',
+              '',
+              'Artifact: `tfplan-' + context.payload.pull_request.head.sha + '` — the apply workflow replays THIS file, not a re-plan.',
+              '',
+              '<details><summary>plan output</summary>',
+              '',
+              '```', tail, '```',
+              '</details>'
+            ].join('\n');
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });

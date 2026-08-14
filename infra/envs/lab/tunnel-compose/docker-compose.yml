@@ -1,0 +1,21 @@
+# Topic 14 — TWO cloudflared replicas on ONE tunnel = HA by construction.
+# Both connectors register with the edge; kill either and traffic keeps
+# flowing through the other. The token comes from the shell environment
+# (terraform output -raw tunnel_token), never from a file.
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+
+  cloudflared-1:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?export TUNNEL_TOKEN first}
+    depends_on: [web]
+    restart: unless-stopped
+
+  cloudflared-2:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN:?export TUNNEL_TOKEN first}
+    depends_on: [web]
+    restart: unless-stopped

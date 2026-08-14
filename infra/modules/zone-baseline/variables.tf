@@ -32,6 +32,12 @@ variable "zones" {
       owner       = optional(string, "platform-team")
       cost_center = optional(string, "lab")
     }), {})
+
+    # ADDED IN v0.2.0 (optional => existing callers unaffected): set false for
+    # consumers that create records but must NOT adopt settings ownership —
+    # settings are a singleton and exactly one root owns them (Topic 9).
+    # Contract tests (Topic 24 tier two) are the canonical false-consumer.
+    manage_settings = optional(bool, true)
   }))
 
   # Validation 1 — the lab- prefix contract on record keys.

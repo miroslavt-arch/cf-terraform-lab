@@ -35,6 +35,8 @@ data "cloudflare_zero_trust_tunnel_cloudflared_token" "this" {
 
 # The public hostname is a proxied CNAME onto the tunnel's edge address.
 resource "cloudflare_dns_record" "public" {
+  count = var.manage_dns ? 1 : 0
+
   zone_id = var.zone_id
   name    = var.public_hostname
   type    = "CNAME"
