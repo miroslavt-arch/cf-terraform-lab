@@ -1,0 +1,49 @@
+# Pre-commit hooks: the last line of defence before a secret or broken file
+# reaches a PUBLIC repository. Install with: pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=512"]
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: forbid-state-and-secret-files
+        name: forbid tfstate / tfvars / .terraform / env files
+        entry: bash -c 'for f in "$@"; do case "$f" in *.tfstate|*.tfstate.*|*.tfvars|*.tfvars.json|*.tfplan|.env|*.pem|*.key) echo "BLOCKED secret-risk file: $f"; exit 1;; *".terraform/"*) echo "BLOCKED .terraform dir file: $f"; exit 1;; esac; done' --
+        language: system
+
+      - id: forbid-token-patterns
+        name: grep staged files for credential patterns
+        entry: bash -c 'rc=0; for f in "$@"; do [ -f "$f" ] || continue; if grep -nE "(CLOUDFLARE|CF)_API_(TOKEN|KEY)[[:space:]]*=[[:space:]]*\"?[A-Za-z0-9_-]{30,}|AWS_SECRET_ACCESS_KEY[[:space:]]*=[[:space:]]*\"?[A-Za-z0-9/+=]{30,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}" "$f"; then echo "BLOCKED credential-looking content in: $f"; rc=1; fi; done; exit $rc' --
+        language: system
+
+      - id: terraform-fmt
+        name: terraform fmt
+        entry: terraform fmt -check -recursive
+        language: system
+        pass_filenames: false
+        files: '\.tf$'
+
+      - id: terraform-docs-zone-baseline
+        name: terraform-docs (zone-baseline)
+        entry: terraform-docs markdown table --output-file README.md --output-mode inject infra/modules/zone-baseline
+        language: system
+        pass_filenames: false
+        files: '^infra/modules/zone-baseline/'
+
+      - id: conftest-waf-fragments
+        name: conftest on WAF fragments
+        entry: bash -c 'conftest test --policy policy infra/modules/waf-composed/rules/'
+        language: system
+        pass_filenames: false
+        files: '^infra/modules/waf-composed/rules/'

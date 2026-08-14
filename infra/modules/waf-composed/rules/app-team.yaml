@@ -1,0 +1,11 @@
+# Fragment: app team. ALWAYS LAST — app rules can never pre-empt incident or
+# security rules. Policy (policy/waf_fragments.rego) forbids this fragment
+# from using the `skip` action or touching admin paths.
+team: app
+owner: app-team@incloudites.com
+review_date: "2026-08-14"
+rules:
+  - ref: lab_app_log_beta
+    description: "Log traffic to the beta path for rollout observability"
+    expression: 'http.host eq "__LAB_HOST__" and starts_with(http.request.uri.path, "/beta")'
+    action: log

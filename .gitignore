@@ -1,0 +1,36 @@
+# --- Terraform state & workdirs: NEVER commit ---
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+crash.log
+crash.*.log
+
+# --- Variable files that may carry values (only *.auto.tfvars.example allowed) ---
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+
+# --- Plan files (may embed sensitive values) ---
+*.tfplan
+*.plan
+plan.out
+plan.json
+
+# --- Credentials / env ---
+.env
+.env.*
+*.pem
+*.key
+*credentials*
+.cf-lab-env
+
+# --- Editor / OS noise ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Terraform-docs scratch ---
+.terraform-docs-cache/

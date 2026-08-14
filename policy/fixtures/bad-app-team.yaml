@@ -1,0 +1,16 @@
+# DELIBERATELY BAD fixture for the Topic 10 demo: this is what the app team
+# is not allowed to ship. `conftest test --policy policy policy/fixtures/bad-app-team.yaml`
+# must FAIL with two violations.
+team: app
+owner: app-team@incloudites.com
+review_date: "2026-08-14"
+rules:
+  - ref: lab_app_sneaky_skip
+    description: "Skip the WAF for our load-test tool (what could go wrong)"
+    expression: 'http.host eq "__LAB_HOST__" and http.user_agent contains "loadtest"'
+    action: skip
+
+  - ref: lab_app_admin_grab
+    description: "Let the app team's dashboard reach /admin directly"
+    expression: 'http.host eq "__LAB_HOST__" and starts_with(http.request.uri.path, "/admin/app")'
+    action: log

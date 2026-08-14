@@ -1,0 +1,14 @@
+# Fragment: security team. Sits between incident (above) and app (below).
+team: security
+owner: security@incloudites.com
+review_date: "2026-08-14"
+rules:
+  - ref: lab_sec_block_admin_paths
+    description: "Block direct hits on admin paths from outside"
+    expression: 'http.host eq "__LAB_HOST__" and starts_with(http.request.uri.path, "/admin")'
+    action: block
+
+  - ref: lab_sec_challenge_no_ua
+    description: "Challenge requests with an empty User-Agent"
+    expression: 'http.host eq "__LAB_HOST__" and http.user_agent eq ""'
+    action: managed_challenge

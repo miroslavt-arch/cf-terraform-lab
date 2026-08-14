@@ -1,0 +1,15 @@
+# Force LF everywhere so bash scripts and Terraform behave identically on
+# Windows (Git Bash), macOS and Linux runners.
+* text=auto eol=lf
+*.sh text eol=lf
+*.tf text eol=lf
+*.tftest.hcl text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.rego text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+
+# Binary-ish
+*.png binary
+*.zip binary

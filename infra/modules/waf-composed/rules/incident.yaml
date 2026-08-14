@@ -1,0 +1,18 @@
+# Fragment: incident-response team. ALWAYS FIRST in the composed ruleset.
+# Rules here are the kill-switches (Topic 11): present in code year-round,
+# enabled only when incident_mode reaches their min_mode.
+team: incident
+owner: incident-response@incloudites.com
+review_date: "2026-08-14"
+rules:
+  - ref: lab_ir_elevated_challenge
+    description: "Elevated: managed-challenge all traffic to the lab host"
+    expression: 'http.host eq "__LAB_HOST__"'
+    action: managed_challenge
+    min_mode: elevated
+
+  - ref: lab_ir_lockdown_block
+    description: "Lockdown: block everything except /healthz on the lab host"
+    expression: 'http.host eq "__LAB_HOST__" and not starts_with(http.request.uri.path, "/healthz")'
+    action: block
+    min_mode: lockdown

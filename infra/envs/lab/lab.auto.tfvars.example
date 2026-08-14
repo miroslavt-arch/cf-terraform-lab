@@ -1,0 +1,6 @@
+# Copy to lab.auto.tfvars (gitignored) and fill in. None of these are secrets,
+# but the real file stays out of git so the example is the single reviewed
+# source of truth for its shape.
+account_id    = "bc682468ed596d21ce506ecbae4cb9a4"
+zone_name     = "gracious-binary.sxplab.com"
+incident_mode = "none"

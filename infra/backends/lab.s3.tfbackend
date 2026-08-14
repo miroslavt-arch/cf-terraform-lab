@@ -1,0 +1,15 @@
+# Partial backend config for envs/lab — Cloudflare R2 via the S3 protocol.
+# Credentials come ONLY from env: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+# Usage: terraform init -backend-config=../../backends/lab.s3.tfbackend
+bucket = "lab-tfstate"
+key    = "envs/lab/terraform.tfstate"
+region = "auto"
+
+endpoints = { s3 = "https://bc682468ed596d21ce506ecbae4cb9a4.r2.cloudflarestorage.com" }
+
+skip_credentials_validation = true
+skip_region_validation      = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true
+skip_s3_checksum            = true
+use_path_style              = true
