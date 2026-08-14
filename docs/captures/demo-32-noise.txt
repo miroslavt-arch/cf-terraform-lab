@@ -1,0 +1,22 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mSharp edge: you wrote a fully-qualified name with the trailing dot. The API stores it without. Your plan will now diff against a ghost, forever.[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> 1/4 — applying the CNAME with the trailing dot ('example.com.')...[0m
+[32mapplied. API actually stored: example.com[0m
+[36m>> 2/4 — planning again, having changed NOTHING...[0m
+      ~ content     = "example.com" -> "example.com."
+Plan: 0 to add, 1 to change, 0 to destroy.
+[31m^ a diff, with zero code changes.[0m
+[36m>> 3/4 — 'fixing' it the way everyone tries first: apply again, twice...[0m
+    after apply #1: Plan: 0 to add, 1 to change, 0 to destroy.
+    after apply #2: Plan: 0 to add, 1 to change, 0 to destroy.
+[31m^ applying does not converge. This pipeline is never green again.[0m
+[36m>> 4/4 — the real fix: write the CANONICAL form (fixed/main.tf, no trailing dot).[0m
+[32mplan is QUIET. Code truth now equals API truth, byte for byte.[0m
+
+[1m──────────────────────────────────────────────────────[0m
+[1mWhy not ignore_changes? It would silence this diff by no longer managing 'content' AT ALL — so a real repoint of this CNAME would also pass unnoticed. You'd trade a cosmetic itch for drift-blindness on the field that matters most.[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> reset: destroying the demo record...[0m
+[32mreset done.[0m

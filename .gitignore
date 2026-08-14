@@ -40,3 +40,6 @@ brownfield/records.csv
 brownfield/ruleset.id
 brownfield/adopt/generated_ruleset.tf
 brownfield/adopt/imports_ruleset.tf
+
+# Local backend override (dev only; R2 is the real backend)
+*_override.tf

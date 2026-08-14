@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Topic 29 — create the "legacy estate" exactly the way a dashboard user
+# Topic 29 - create the "legacy estate" exactly the way a dashboard user
 # would: raw API calls, no Terraform, deliberately inconsistent values
 # (mixed TTLs, missing comments) so adoption has something to normalize.
 #
@@ -7,7 +7,7 @@
 #   - 5 DNS records: lab-legacy-{alpha..echo}.lab.<zone>
 #   - 1 ruleset in the http_response_headers_transform phase (a DIFFERENT
 #     phase from the WAF ruleset, so the two never fight over a singleton)
-# Writes brownfield/records.csv (name,id,type) — the import for_each source.
+# Writes brownfield/records.csv (name,id,type) - the import for_each source.
 source "$(dirname "$0")/../scripts/lib/common.sh"
 need_env CLOUDFLARE_API_TOKEN LAB_ZONE
 
@@ -29,33 +29,35 @@ for suffix in alpha bravo charlie delta echo; do
     echo "$name,$existing,TXT" >> "$csv"
     continue
   fi
-  # deliberately messy: varying TTLs, no comments — classic hand-made estate
+  # deliberately messy: varying TTLs, no comments - classic hand-made estate
   ttl=$((i * 120))
   id=$(cf_api POST "/zones/$zone_id/dns_records" CLOUDFLARE_API_TOKEN \
-    "{\"type\":\"TXT\",\"name\":\"$name\",\"content\":\"\\\"legacy record $suffix — made by hand\\\"\",\"ttl\":$ttl}" \
+    "{\"type\":\"TXT\",\"name\":\"$name\",\"content\":\"\\\"legacy record $suffix - made by hand\\\"\",\"ttl\":$ttl}" \
     | jq -r '.result.id')
   green "created: $name ($id, ttl=$ttl)"
   echo "$name,$id,TXT" >> "$csv"
 done
 
-note "creating the legacy ruleset (response-header transform phase)..."
-existing_rs=$(cf_api GET "/zones/$zone_id/rulesets?per_page=50" | jq -r '.result[] | select(.name=="lab-legacy-headers") | .id')
+note "creating the legacy ruleset (rate-limit phase - deliberately a DIFFERENT"
+note "phase from the lab WAF, so adoption can never fight the real ruleset)..."
+existing_rs=$(cf_api GET "/zones/$zone_id/rulesets?per_page=50" | jq -r '.result[] | select(.name=="lab-legacy-ratelimit") | .id')
 if [ -n "$existing_rs" ]; then
   note "ruleset exists: $existing_rs"
 else
-  existing_rs=$(cf_api PUT "/zones/$zone_id/rulesets/phases/http_response_headers_transform/entrypoint" CLOUDFLARE_API_TOKEN '{
-    "name": "lab-legacy-headers",
+  existing_rs=$(cf_api PUT "/zones/$zone_id/rulesets/phases/http_ratelimit/entrypoint" CLOUDFLARE_API_TOKEN '{
+    "name": "lab-legacy-ratelimit",
     "description": "made by hand in the dashboard, adopted in Topic 29",
     "rules": [{
-      "ref": "lab_legacy_marker",
-      "description": "stamp responses from the legacy era",
-      "expression": "true",
-      "action": "rewrite",
-      "action_parameters": {"headers": {"x-lab-legacy": {"operation": "set", "value": "true"}}}
+      "ref": "lab_legacy_rl",
+      "description": "legacy rate limit nobody remembers adding",
+      "expression": "http.host eq \"lab-legacy.example.com\"",
+      "action": "block",
+      "ratelimit": {"characteristics": ["ip.src", "cf.colo.id"], "period": 60,
+                    "requests_per_period": 100, "mitigation_timeout": 60}
     }]
   }' | jq -r '.result.id')
   green "created ruleset: $existing_rs"
 fi
 echo "$existing_rs" > "$REPO_ROOT/brownfield/ruleset.id"
 
-green "legacy estate ready. CSV: brownfield/records.csv — now run scripts/demo-29-adopt.sh"
+green "legacy estate ready. CSV: brownfield/records.csv - now run scripts/demo-29-adopt.sh"

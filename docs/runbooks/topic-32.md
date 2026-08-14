@@ -16,14 +16,22 @@ again and again: every shared thing needs exactly one owner.
 Two roots claim `http_request_late_transform`. A applies and owns it; B's
 apply **fails** (`already exists`) — and the README walks the ping-pong that
 starts when B's team "fixes" it by deleting A's ruleset.
-*Expected:* A green → B red with the API's duplicate-phase error → reset.
+*Real output (2026-08-14):* A applies green; B fails on the API call — the
+phase slot is taken. Phase used is `http_request_firewall_managed`, chosen
+because the lab's real WAF owns `http_request_firewall_custom` and the
+apply token deliberately lacks transform-phase permission.
 **Fix:** one root per phase; teams contribute fragments (Topic 10).
 
 ## 2. Dual writers — `demo-32-dual.sh`
 A creates `lab-dual` TXT; B *imports* it (innocent onboarding!) and applies
 its own content. Live value flips B→A→B… both pipelines green forever.
-*Expected:* `owned-by-A` → `owned-by-B` → A's plan shows "drift" → back to
-`owned-by-A`.
+*Real output (2026-08-14):*
+```
+Root A creates lab-dual   -> live content: "owned-by-A"
+Root B imports + applies  -> live content: "owned-by-B"   (B's pipeline green)
+A's nightly plan:  ~ content = "\"owned-by-B\"" -> "\"owned-by-A\""
+A's auto-apply    -> live content: "owned-by-A"    ...and repeat, forever
+```
 **Fix:** one record, one owner root. **Detection:** Topic 27 — the audit log
 shows the *other pipeline's token* as the drift actor.
 
@@ -40,12 +48,24 @@ destroy per-item (500 deletes) = ___ s.
 **Trade-off:** per-item buys per-item ownership at brutal refresh cost;
 bulk is fast but single-owner. At 500 items the numbers decide.
 
-## 4. Plan noise — `demo-32-noise.sh`
-CNAME content written `LAB-App.LAB.<zone>`; the API stores lowercase; every
-plan proposes the same no-op update, forever. Fix root writes the canonical
-lowercase — plan goes quiet permanently.
-*Expected:* `~ content` diff with zero code changes → after fix,
-`-detailed-exitcode` returns 0.
+## 4. Plan noise — `demo-32-noise.sh`  (REAL output, 2026-08-14)
+A CNAME target written the correct DNS way — **with the trailing dot**,
+`example.com.` — which Cloudflare stores without it:
+
+```
+applied. API actually stored: example.com
+      ~ content     = "example.com" -> "example.com."
+Plan: 0 to add, 1 to change, 0 to destroy.
+    after apply #1: Plan: 0 to add, 1 to change, 0 to destroy.
+    after apply #2: Plan: 0 to add, 1 to change, 0 to destroy.
+```
+
+Applying does **not** converge — that pipeline is never green again. Writing
+the canonical form (no dot) makes the plan quiet permanently.
+
+**Verified NOT to reproduce on v5.23.0** (don't promise these on stage):
+DNS name/target *case* — provider normalizes it; TXT quote-wrapping —
+handled; IP list `/32` — hard validation error, not noise.
 **Why `ignore_changes` is the wrong fix:** it silences the phantom diff by
 no longer managing content at all — a *real* repoint of the CNAME would
 also pass unnoticed. You'd trade a cosmetic itch for drift-blindness on the

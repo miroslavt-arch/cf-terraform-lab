@@ -26,21 +26,37 @@ bash brownfield/seed-legacy.sh     # once: create the mess (raw API, no TF)
 bash scripts/demo-29-adopt.sh      # discover -> import -> generate -> normalize -> GATE
 ```
 
-## Expected output *(unverified until first live run; script contract)*
+## Expected output (REAL, captured 2026-08-14)
 
 ```
-seed:  created: lab-legacy-alpha.lab.<zone> (…, ttl=120) … x5 + ruleset
-1/4:   Plan: 5 to import, 0 to add, 0 to change, 0 to destroy.
-2/4:   Terraform wrote the ruleset config itself: generated_ruleset.tf
-3/4:   normalized generated_ruleset.tf: removed NN noise lines
-4/4:   Imported 6 resources.
+1/4 — planning the CSV-driven import blocks (5 records, ONE import block)...
+  # cloudflare_dns_record.legacy["lab-legacy-alpha.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-bravo...."] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-charlie...."] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-delta...."] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-echo...."] will be imported
+Plan: 5 to import, 0 to add, 0 to change, 0 to destroy.
+
+2/4 — Terraform wrote the ruleset config itself: generated_ruleset.tf
+3/4 — normalized generated_ruleset.tf: removed 84 noise lines
+4/4 — Apply complete! Resources: 6 imported, 0 added, 0 changed, 0 destroyed.
 
 THE GATE:
 No changes. Your infrastructure matches the configuration.
 ```
 
-Before/after proof: `/tmp/adopt-before.txt` (5 to import) vs
-`/tmp/adopt-after.txt` (No changes) — paste both here after the first run.
+**Read the counters aloud: `0 changed, 0 destroyed`.** That is the proof that
+adoption touched nothing — Terraform took ownership of six live objects and
+altered none of them.
+
+### The failure this demo hit while being built (worth telling)
+The first run reported **`5 changed`** — adoption was silently rewriting the
+records. Cause: the seeded TXT content contained an em-dash, and Cloudflare
+stores non-ASCII in TXT as octal escapes (three backslash-escaped
+bytes instead of the character), so the config
+never matched what the API held. The gate caught it. That is exactly what the
+gate is *for*: without it, "adoption" would have quietly edited five live
+records and nobody would have known.
 
 ## Failure mode prevented
 The classic adoption disaster: import, see a noisy plan, apply it anyway,

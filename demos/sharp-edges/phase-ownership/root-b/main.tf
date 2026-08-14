@@ -20,15 +20,13 @@ resource "cloudflare_ruleset" "late_transform" {
   name        = "lab-phase-owner-B"
   description = "lab: sharp-edge demo — root B ALSO believes it owns this phase"
   kind        = "zone"
-  phase       = "http_request_late_transform"
+  phase       = "http_request_firewall_managed"
 
   rules = [{
-    ref         = "lab_edge_b"
-    description = "B's rewrite"
-    expression  = "starts_with(http.request.uri.path, \"/lab-edge-b\")"
-    action      = "rewrite"
-    action_parameters = {
-      uri = { path = { value = "/lab-rewritten-by-b" } }
-    }
+    ref               = "lab_edge_b"
+    description       = "B's managed-rules deployment"
+    expression        = "http.host eq \"lab-edge-b.lab.example.com\""
+    action            = "skip"
+    action_parameters = { ruleset = "current" }
   }]
 }

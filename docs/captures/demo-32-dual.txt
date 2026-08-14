@@ -1,0 +1,19 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mSharp edge: two roots, one DNS record — nobody errors, everybody 'drifts'[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> Root A creates lab-dual (content: owned-by-A)...[0m
+[32mlive content: "owned-by-A"[0m
+[36m>> Root B imports the same record and applies ITS truth (owned-by-B)...[0m
+[31mlive content: "owned-by-B"   <- B's pipeline is green; A never consented[0m
+[36m>> Root A's nightly plan now sees 'drift' it can't explain...[0m
+      ~ content     = "\"owned-by-B\"" -> "\"owned-by-A\""
+Plan: 0 to add, 1 to change, 0 to destroy.
+[36m>> ...and A's auto-apply 'heals' it:[0m
+[32mlive content: "owned-by-A"   <- flipped back. This repeats FOREVER, both pipelines green.[0m
+
+[1m──────────────────────────────────────────────────────[0m
+[1mFix: one record, one owner root. Detection: Topic 27 drift + audit log shows the other pipeline's token as the actor.[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> reset: destroying the demo record from A; discarding B's local state...[0m
+[32mreset done.[0m

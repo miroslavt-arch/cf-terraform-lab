@@ -27,16 +27,20 @@ bash scripts/demo-11-arm.sh          # run WITH A STOPWATCH — it times itself
 cat .github/PULL_REQUEST_TEMPLATE/break-glass.md   # the paved road for prod
 ```
 
-## Expected output *(unverified until first live run; script's contract)*
+## Expected output (REAL, captured 2026-08-14)
 
 ```
 armed incident rules BEFORE: []  (expected: empty)
-ARMED at the edge in NN seconds. armed rules: [lab_ir_elevated_challenge]
-DISARMED in NN seconds. armed rules: []
+tfvars flipped to elevated; applying...
+ARMED at the edge in 6 seconds. armed rules: [lab_ir_elevated_challenge]
+
+Incident over — disarming (same loop, reverse direction)
+DISARMED in 6 seconds. armed rules: []  (expected: empty)
 ```
 
-**⏱ Record the two measured numbers here after the first run: ARM = ___ s,
-DISARM = ___ s.** They are the demo's punchline.
+**⏱ MEASURED: ARM = 6 s, DISARM = 6 s** — declaration to live-at-the-edge, end
+to end, including the Terraform round trip. That number is the punchline: say
+it out loud before you run the demo, then let the stopwatch confirm it.
 
 Reminder workflow while armed:
 ```

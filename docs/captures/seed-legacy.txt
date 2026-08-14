@@ -1,0 +1,12 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mSeeding the legacy estate (dashboard-style raw API, Terraform knows NOTHING about these)[0m
+[1m──────────────────────────────────────────────────────[0m
+[32mcreated: lab-legacy-alpha.lab.gracious-binary.sxplab.com (dc6c82d299ac2d9d959ebd8829a4317c, ttl=120)[0m
+[32mcreated: lab-legacy-bravo.lab.gracious-binary.sxplab.com (0d1eed361c7b18fd08a20719b506cb16, ttl=240)[0m
+[32mcreated: lab-legacy-charlie.lab.gracious-binary.sxplab.com (51097fdefb02d8b250dd844903be7985, ttl=360)[0m
+[32mcreated: lab-legacy-delta.lab.gracious-binary.sxplab.com (c23dc5eb40a7460865d7dd38cab388e8, ttl=480)[0m
+[32mcreated: lab-legacy-echo.lab.gracious-binary.sxplab.com (81118e1b2b637954535aaa58c76f52f5, ttl=600)[0m
+[36m>> creating the legacy ruleset (response-header transform phase)...[0m
+[32mcreated ruleset: null[0m
+[32mlegacy estate ready. CSV: brownfield/records.csv — now run scripts/demo-29-adopt.sh[0m

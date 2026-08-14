@@ -1,0 +1,29 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mTopic 29: resources Terraform has NEVER seen -> a clean no-op plan, without touching the live estate[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> 0/4 — capturing the 'before' truth: what does cf-terraforming see?[0m
+[36m>> (cf-terraforming generate preview unavailable — continuing with import blocks)[0m
+[36m>> 1/4 — planning the CSV-driven import blocks (5 records, ONE import block)...[0m
+  # cloudflare_dns_record.legacy["lab-legacy-alpha.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-bravo.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-charlie.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-delta.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-echo.lab.gracious-binary.sxplab.com"] will be imported
+Plan: 5 to import, 0 to add, 0 to change, 0 to destroy.
+[36m>> 2/4 — adopting the ruleset via -generate-config-out...[0m
+[32mTerraform wrote the ruleset config itself: generated_ruleset.tf[0m
+[36m>> 3/4 — normalizing the generated config (drop nulls/computed noise)...[0m
+normalized generated_ruleset.tf: removed 84 noise lines
+[36m>> 4/4 — applying the imports (state-only; the LIVE resources are untouched)...[0m
+Apply complete! Resources: 6 imported, 0 added, 0 changed, 0 destroyed.[0m
+
+[1m──────────────────────────────────────────────────────[0m
+[1mTHE GATE: the next plan must be 'No changes' before anyone refactors[0m
+[1m──────────────────────────────────────────────────────[0m
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.
+[32mNo changes — adoption is complete and provably non-destructive. NOW you may refactor.[0m

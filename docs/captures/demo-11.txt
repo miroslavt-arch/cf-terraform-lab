@@ -1,0 +1,13 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mTopic 11: kill-switches live in code all year, disabled. Incident declared — start the clock.[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> armed incident rules BEFORE: []  (expected: empty)[0m
+[36m>> tfvars flipped to elevated; applying...[0m
+[32mARMED at the edge in 6 seconds. armed rules: [lab_ir_elevated_challenge][0m
+
+[1m──────────────────────────────────────────────────────[0m
+[1mIncident over — disarming (same loop, reverse direction)[0m
+[1m──────────────────────────────────────────────────────[0m
+[32mDISARMED in 6 seconds. armed rules: []  (expected: empty)[0m
+[36m>> record both numbers in docs/runbooks/topic-11.md[0m
