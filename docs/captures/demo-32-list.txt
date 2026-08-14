@@ -3,3 +3,91 @@
 [1mSharp edge: the same 500 list entries as 500 resources vs 1 resource — measure, don't argue[0m
 [1m──────────────────────────────────────────────────────[0m
 [36m>> applying per-item (n=500)...[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mfailed to make http request[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  with cloudflare_list_item.ip[196],
+[31m│[0m [0m  on main.tf line 28, in resource "cloudflare_list_item" "ip":
+[31m│[0m [0m  28: resource "cloudflare_list_item" "ip" [4m{[0m[0m
+[31m│[0m [0m
+[31m│[0m [0mPOST
+[31m│[0m [0m"https://api.cloudflare.com/client/v4/accounts/bc682468ed596d21ce506ecbae4cb9a4/rules/lists/d3ec00e792264dc58975ca1b806fd3a5/items":
+[31m│[0m [0m429 Too Many Requests {
+[31m│[0m [0m  "result": null,
+[31m│[0m [0m  "success": false,
+[31m│[0m [0m  "errors": [
+[31m│[0m [0m    {
+[31m│[0m [0m      "code": 10040,
+[31m│[0m [0m      "message": "you have been ratelimited please wait and try again"
+[31m│[0m [0m    }
+[31m│[0m [0m  ],
+[31m│[0m [0m  "messages": []
+[31m│[0m [0m}
+[31m│[0m [0m
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mfailed to make http request[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  with cloudflare_list_item.ip[241],
+[31m│[0m [0m  on main.tf line 28, in resource "cloudflare_list_item" "ip":
+[31m│[0m [0m  28: resource "cloudflare_list_item" "ip" [4m{[0m[0m
+[31m│[0m [0m
+[31m│[0m [0mPOST
+[31m│[0m [0m"https://api.cloudflare.com/client/v4/accounts/bc682468ed596d21ce506ecbae4cb9a4/rules/lists/d3ec00e792264dc58975ca1b806fd3a5/items":
+[31m│[0m [0m429 Too Many Requests {
+[31m│[0m [0m  "result": null,
+[31m│[0m [0m  "success": false,
+[31m│[0m [0m  "errors": [
+[31m│[0m [0m    {
+[31m│[0m [0m      "code": 10040,
+[31m│[0m [0m      "message": "you have been ratelimited please wait and try again"
+[31m│[0m [0m    }
+[31m│[0m [0m  ],
+[31m│[0m [0m  "messages": []
+[31m│[0m [0m}
+[31m│[0m [0m
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mfailed to make http request[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  with cloudflare_list_item.ip[138],
+[31m│[0m [0m  on main.tf line 28, in resource "cloudflare_list_item" "ip":
+[31m│[0m [0m  28: resource "cloudflare_list_item" "ip" [4m{[0m[0m
+[31m│[0m [0m
+[31m│[0m [0mPOST
+[31m│[0m [0m"https://api.cloudflare.com/client/v4/accounts/bc682468ed596d21ce506ecbae4cb9a4/rules/lists/d3ec00e792264dc58975ca1b806fd3a5/items":
+[31m│[0m [0m429 Too Many Requests {
+[31m│[0m [0m  "result": null,
+[31m│[0m [0m  "success": false,
+[31m│[0m [0m  "errors": [
+[31m│[0m [0m    {
+[31m│[0m [0m      "code": 10040,
+[31m│[0m [0m      "message": "you have been ratelimited please wait and try again"
+[31m│[0m [0m    }
+[31m│[0m [0m  ],
+[31m│[0m [0m  "messages": []
+[31m│[0m [0m}
+[31m│[0m [0m
+[31m╵[0m[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mfailed to make http request[0m
+[31m│[0m [0m
+[31m│[0m [0m[0m  with cloudflare_list_item.ip[221],
+[31m│[0m [0m  on main.tf line 28, in resource "cloudflare_list_item" "ip":
+[31m│[0m [0m  28: resource "cloudflare_list_item" "ip" [4m{[0m[0m
+[31m│[0m [0m
+[31m│[0m [0mPOST
+[31m│[0m [0m"https://api.cloudflare.com/client/v4/accounts/bc682468ed596d21ce506ecbae4cb9a4/rules/lists/d3ec00e792264dc58975ca1b806fd3a5/items":
+[31m│[0m [0m429 Too Many Requests {
+[31m│[0m [0m  "result": null,
+[31m│[0m [0m  "success": false,
+[31m│[0m [0m  "errors": [
+[31m│[0m [0m    {
+[31m│[0m [0m      "code": 10040,
+[31m│[0m [0m      "message": "you have been ratelimited please wait and try again"
+[31m│[0m [0m    }
+[31m│[0m [0m  ],
+[31m│[0m [0m  "messages": []
+[31m│[0m [0m}
+[31m│[0m [0m
+[31m╵[0m[0m

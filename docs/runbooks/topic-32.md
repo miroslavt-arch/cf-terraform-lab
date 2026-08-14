@@ -35,18 +35,46 @@ A's auto-apply    -> live content: "owned-by-A"    ...and repeat, forever
 **Fix:** one record, one owner root. **Detection:** Topic 27 — the audit log
 shows the *other pipeline's token* as the drift actor.
 
-## 3. List scale — `demo-32-list.sh` (real numbers, this account)
-Same 500 IPs: `per-item/` = 500 `cloudflare_list_item` resources;
-`bulk/` = one `cloudflare_list` with an `items` collection. The script
-applies both, times `terraform plan` on each, then tears down (the bulk list
-carries `prevent_destroy` — the script demonstrates the guard blocking
-destroy, then uses the state-rm + API-delete path).
+## 3. List scale — `demo-32-list.sh` (REAL numbers, this account, 2026-08-14)
 
-**⏱ Record after first run:** plan per-item = ___ s · plan bulk = ___ s ·
-destroy per-item (500 deletes) = ___ s.
+Same data, two shapes: `per-item/` models each entry as its own
+`cloudflare_list_item` resource; `bulk/` is one `cloudflare_list` carrying an
+`items` collection.
 
-**Trade-off:** per-item buys per-item ownership at brutal refresh cost;
-bulk is fast but single-owner. At 500 items the numbers decide.
+| Operation (500 entries) | per-item (500 resources) | bulk (1 resource) |
+|---|---|---|
+| `terraform apply` | **FAILED** — HTTP 429 `you have been ratelimited` partway through, leaving a half-built list (496/500) | **51 s**, clean |
+| `terraform plan` (no-op) | **43 s** | **31 s** |
+| `terraform destroy` | **>2 min and still grinding** — one API call per item, rate-limited | n/a (guarded, see below) |
+| delete the whole list via one API call | **2 s** | **2 s** |
+
+**The headline is not "slower" — it is "does not work".** At 500 entries the
+per-item shape cannot complete an apply against this account: Cloudflare
+rate-limits the per-item POSTs and Terraform aborts mid-way, leaving an estate
+that matches neither the code nor the previous state. The demo script therefore
+defaults to `ITEM_COUNT=150`, which completes reliably; set `ITEM_COUNT=500`
+off-stage if you want to watch it fail.
+
+The 2-second full-list delete is worth saying out loud: the API can drop the
+entire object instantly, but Terraform — because *you* told it these were 500
+independent resources — must delete them one at a time.
+
+**prevent_destroy:** the bulk list carries `lifecycle { prevent_destroy = true }`.
+Destroy is refused:
+
+```
+Error: Instance cannot be destroyed
+Resource cloudflare_list.bulk has lifecycle.prevent_destroy set
+```
+
+Documented removal path (what the script does): `terraform state rm` followed
+by an explicit API delete. That two-step is the point — removing a guarded
+resource should take a deliberate act, not a flag.
+
+**Trade-off:** per-item buys per-item ownership (different teams or modules can
+contribute individual entries) and charges you on every plan, forever, plus a
+rate-limit cliff. One collection is fast and durable but has exactly one owner.
+That is Topic 9's singleton lesson at a different altitude.
 
 ## 4. Plan noise — `demo-32-noise.sh`  (REAL output, 2026-08-14)
 A CNAME target written the correct DNS way — **with the trailing dot**,
