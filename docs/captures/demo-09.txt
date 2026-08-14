@@ -1,0 +1,16 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mTopic 9: zone settings are singletons — two roots that both 'own' one setting will flap it forever, with green pipelines all round[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> current security_level: high[0m
+[36m>> Root A applies (believes: high)...[0m
+[32mroot A applied. dashboard value now: high[0m
+[36m>> Root B applies (believes: essentially_off)...[0m
+[31mroot B applied. dashboard value now: essentially_off   <- A's value silently overwritten[0m
+[36m>> Root A runs its nightly pipeline again...[0m
+[32mvalue now: high   <- and back again. Forever.[0m
+
+[1m──────────────────────────────────────────────────────[0m
+[1mThe fix: ONE owner. envs/lab's zone-baseline owns settings; overrides go through its allow-list. Restoring the real baseline now...[0m
+[1m──────────────────────────────────────────────────────[0m
+[32mbaseline restored: security_level = high[0m

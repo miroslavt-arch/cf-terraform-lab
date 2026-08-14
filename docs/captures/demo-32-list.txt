@@ -1,0 +1,5 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mSharp edge: the same 500 list entries as 500 resources vs 1 resource — measure, don't argue[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> applying per-item (n=500)...[0m

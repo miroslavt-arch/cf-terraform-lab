@@ -1,0 +1,20 @@
+
+[1m──────────────────────────────────────────────────────[0m
+[1mTopic 20: an approved plan is pinned to the exact state it was computed from — drift in between voids it[0m
+[1m──────────────────────────────────────────────────────[0m
+[36m>> 1/3 — saving a plan (this is what the PR pipeline stores as an artifact)...[0m
+[32mplan saved: stale-demo.tfplan[0m
+[36m>> 2/3 — meanwhile, 'someone' edits a lab record out of band (TTL 300 -> 600 via raw API)...[0m
+  API says: ttl now 600
+[32mstate has moved on (refresh-only apply recorded the out-of-band TTL)[0m
+[36m>> 3/3 — now applying the SAVED plan...[0m
+[31m╷[0m[0m
+[31m│[0m [0m[1m[31mError: [0m[0m[1mSaved plan is stale[0m
+[31m│[0m [0m
+[31m│[0m [0m[0mThe given plan file can no longer be applied because the state was changed
+[31m│[0m [0mby another operation after the plan was created.
+[31m╵[0m[0m
+
+[32m^ Terraform REFUSED: 'saved plan is stale'. The artifact your reviewer approved is the ONLY thing that can be applied, and only against the world it was computed for.[0m
+[36m>> reset: re-plan + apply to restore TTL 300...[0m
+[32mestate back to code truth. Demo is rerunnable.[0m
