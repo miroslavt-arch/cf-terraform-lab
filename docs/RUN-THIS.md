@@ -15,7 +15,7 @@ Two windows: **Chrome** (5 tabs, in order) and **one terminal**.
 | **2** | Actions |
 | **3** | Settings → Environments |
 | **4** | Cloudflare DNS records |
-| **5** | Code: `waf-composed/main.tf` |
+| **5** | The repo, code view — starts at the root tree |
 
 **Terminal, before you share your screen:**
 ```bash
@@ -46,10 +46,22 @@ diff. Never cut Topic 20 or 29 — those two change minds.
 
 # 0:00 — OPENING (5 min)
 
-**Tab 5.**
+**Tab 5 — the repo root.** This is your code tab for the whole session; you
+navigate inside it three times (here, Topic 10, Topic 14). Starting at the
+root gives people a map before you take them into any one file.
+
+**DO** — point at the top-level directories as you name them.
 
 **SAY**
 
+> "Quick orientation, because you'll see these directories all afternoon.
+> `infra/modules` holds the reusable building blocks — three of them.
+> `infra/envs` is the thing that actually applies; environments are
+> directories here, not Terraform workspaces, and I'll come back to why.
+> `policy` is Open Policy Agent rules that run against plan output. `tests`
+> are Terraform's own native tests. `demos` is four deliberately broken
+> setups. And `scripts` is one runnable demo per topic."
+>
 > "Everything you are about to see is real. A real Cloudflare zone, real
 > Terraform state, real GitHub Actions runs. Nothing is a mock-up and nothing
 > is pre-recorded. If something fails while I'm doing it, that's a genuine
@@ -60,14 +72,26 @@ diff. Never cut Topic 20 or 29 — those two change minds.
 > are the actual curriculum. Anyone can show you a working `terraform apply`.
 > The useful knowledge is what happens when two teams both think they own the
 > same resource, or when the API quietly rewrites what you asked for."
+
+**DO** — click into **`policy`**, then **`destroy_guard.rego`**
+
+**SAY**
+
+> "Before I touch a live account in front of you, here's the safety model, and
+> I want to show it rather than promise it."
 >
-> "One word on safety, since we're pointing at a live account. Every resource
-> this lab creates is named `lab-` something, or lives under a `lab.`
-> subdomain. There's an Open Policy Agent rule wired into the pipeline that
-> fails any plan proposing to destroy a resource without that marker. So the
-> blast radius isn't a promise I'm making you — it's a check that runs. That's
-> a pattern worth stealing on its own: if your safety rule isn't executable,
-> it isn't a safety rule, it's a hope."
+> "Every resource this lab creates is named `lab-` something, or lives under a
+> `lab.` subdomain. This file is the enforcement: it reads the JSON output of
+> a Terraform plan, finds every resource being destroyed, and fails the plan if
+> any of them lacks that marker. It's wired into the pull-request pipeline, so
+> it runs on every plan before a human ever looks at it."
+>
+> "The pattern is worth stealing on its own, separately from anything
+> Cloudflare-specific: if your safety rule lives in a runbook or a wiki page,
+> it isn't a safety rule, it's a hope. If it exits non-zero, it's a rule.
+> That distinction runs through everything today."
+
+**DO** — click the repo name in the breadcrumb to return to the root
 
 ---
 
@@ -415,7 +439,9 @@ bash scripts/demo-10-fragment-lint.sh
 > they like, and they cannot edit the thing that says no to them. That
 > separation is what makes it governance rather than a suggestion."
 
-**DO** — **Tab 5**, point at `ordered_rules = concat(...)`
+**DO** — **Tab 5**: navigate to `infra/modules/waf-composed/main.tf`
+(from the root: `infra` → `modules` → `waf-composed` → `main.tf`). Point at
+the line `ordered_rules = concat(...)`
 
 **SAY**
 
