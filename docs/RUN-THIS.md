@@ -536,7 +536,7 @@ bash scripts/demo-11-arm.sh
 
 **SAY** — point at **ARMED at the edge in 6 seconds**
 
-> "Six seconds from decision to live at the edge. And six seconds back — the
+> "Six seconds from decision to live at the edge. And about the same coming back — the
 > reverse direction matters just as much, because a control you're afraid to
 > turn off is a control you'll hesitate to turn on."
 >

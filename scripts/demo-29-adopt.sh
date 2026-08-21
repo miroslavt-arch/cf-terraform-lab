@@ -14,6 +14,11 @@ cd "$adopt"
 zone_id=$(cf_api GET "/zones?name=$LAB_ZONE" | jq -r '.result[0].id')
 [ -f "$REPO_ROOT/brownfield/records.csv" ] || { red "run brownfield/seed-legacy.sh first"; exit 1; }
 
+# Make the demo re-runnable: drop any state from a previous run so the import
+# blocks have something to import. This removes STATE ONLY — the live legacy
+# resources are untouched, which is the whole point of the topic.
+rm -f "$adopt"/terraform.tfstate "$adopt"/terraform.tfstate.backup       "$adopt"/generated_ruleset.tf "$adopt"/imports_ruleset.tf
+
 say "Topic 29: resources Terraform has NEVER seen -> a clean no-op plan, without touching the live estate"
 
 note "0/4 — capturing the 'before' truth: what does cf-terraforming see?"

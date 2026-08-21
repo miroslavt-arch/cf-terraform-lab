@@ -29,6 +29,7 @@ def audit_events(account_id: str, token: str, hours: int):
         f"{API}/accounts/{account_id}/logs/audit?since={urllib.parse.quote(since)}&limit=250",
         f"{API}/accounts/{account_id}/audit_logs?since={urllib.parse.quote(since)}&per_page=250",
     ]
+    last_error = "not attempted"
     for url in endpoints:
         req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         try:
@@ -38,7 +39,13 @@ def audit_events(account_id: str, token: str, hours: int):
             if result:
                 return result
         except Exception as exc:  # noqa: BLE001 - keep the demo resilient
-            print(f"<!-- audit endpoint failed: {url.split('?')[0]} : {exc} -->")
+            last_error = exc
+    print(
+        "_Audit lookup unavailable ("
+        + str(last_error).split(":")[0].strip()
+        + "). The audit token needs Account Settings: Read in addition to "
+        + "Access: Audit Logs: Read. Detection above is unaffected._"
+    )
     return []
 
 
@@ -59,8 +66,16 @@ def normalize(ev):
 
 
 def drifted_resources(plan):
+    """Collect drift from BOTH shapes Terraform emits.
+
+    A `-refresh-only` plan records what changed in the real world under
+    `resource_drift`; a normal plan records intended actions under
+    `resource_changes`. The nightly detector uses refresh-only, so reading
+    only `resource_changes` silently reports "no drift" while the exit code
+    says 2 — read both.
+    """
     out = []
-    for rc in plan.get("resource_changes", []):
+    for rc in plan.get("resource_drift", []) + plan.get("resource_changes", []):
         change = rc.get("change", {})
         actions = change.get("actions", [])
         if actions and actions != ["no-op"]:
@@ -90,12 +105,12 @@ def main():
     drifted = drifted_resources(plan)
     print("## Drift report\n")
     if not drifted:
-        print("No drift — the estate matches the code. ✅")
+        print("No drift - the estate matches the code.")
         return
 
     print(f"**{len(drifted)} resource(s) drifted from code truth:**\n")
     for d in drifted:
-        print(f"- `{d['address']}` — actions: {', '.join(d['actions'])}")
+        print(f"- `{d['address']}`  actions: {', '.join(d['actions'])}")
 
     token = os.environ.get("CLOUDFLARE_AUDIT_TOKEN", "")
     account = os.environ.get("CF_ACCOUNT_ID", "")
@@ -118,7 +133,7 @@ def main():
         # raw event mentions any drifted resource id/name
         blob = json.dumps(ev["raw"])
         hit = ev["resource_id"] in ids or any(i and i in blob for i in ids)
-        mark = " ⬅ **matches drifted resource**" if hit else ""
+        mark = " <== **matches drifted resource**" if hit else ""
         if hit:
             attributed = True
         print(
