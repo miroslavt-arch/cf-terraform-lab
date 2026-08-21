@@ -7,7 +7,7 @@ terminal**. Every step says where you are and exactly what to do.
 
 | Tab | What it is |
 |---|---|
-| **1** | Pull request #2 |
+| **1** | Pull request #3 |
 | **2** | Actions |
 | **3** | Settings → Environments |
 | **4** | Cloudflare DNS records |
