@@ -1,9 +1,7 @@
-# Topic 20 (apply side) — the human gate.
-# Takes the tf-pr run id + commit SHA, downloads EXACTLY that plan artifact,
-# and applies it inside the lab-apply environment: required reviewer + 1-min
-# wait timer fire BEFORE the job gets the write token. If state moved since
-# the plan was saved, terraform refuses the stale plan — that refusal is the
-# Topic 20 money demo.
+# Topic 20 (apply side) — THE HUMAN GATE.
+# Downloads the exact plan artifact tf-pr produced and applies it inside the
+# lab-apply environment: 1-minute wait timer + required reviewer fire BEFORE
+# the job is handed the write token.
 name: tf-apply
 
 on:
@@ -27,14 +25,10 @@ jobs:
     environment: lab-apply           # required reviewer + wait timer live here
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}   # write token
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      TF_VAR_account_id: ${{ vars.CF_ACCOUNT_ID }}
       TF_VAR_zone_name: ${{ vars.LAB_ZONE }}
-      TF_VAR_incident_mode: ${{ vars.INCIDENT_MODE || 'none' }}
     defaults:
       run:
-        working-directory: infra/envs/lab
+        working-directory: infra/envs/ci-demo
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,14 +36,15 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.15.8"
+          terraform_wrapper: false
       - name: download the EXACT plan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ inputs.sha }}
           run-id: ${{ inputs.plan_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: infra/envs/lab/
-      - name: init (R2 backend)
-        run: terraform init -input=false -backend-config=../../backends/lab.s3.tfbackend
+          path: infra/envs/ci-demo/
+      - name: init
+        run: terraform init -input=false
       - name: apply the pinned plan — NOT a fresh plan
         run: terraform apply -input=false plan-${{ inputs.sha }}.tfplan

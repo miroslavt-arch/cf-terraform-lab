@@ -4,8 +4,6 @@
 name: contract-tests
 
 on:
-  schedule:
-    - cron: "42 2 * * *"
   workflow_dispatch: {}
 
 permissions:
