@@ -8,7 +8,7 @@ variable "zone_name" {
 variable "demo_note" {
   description = "Text stamped into the record. Change this in a PR to produce a visible, reviewable plan diff."
   type        = string
-  default     = "created by the gated pipeline"
+  default     = "applied live, after a human approved the plan"
 }
 
 data "cloudflare_zone" "lab" {
