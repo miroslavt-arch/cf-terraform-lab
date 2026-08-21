@@ -59,13 +59,13 @@ Short on time? Cut Topic 14 first, then one of the two Topic 32 demos.
 *The one with a timer in it. Do it first while everyone is fresh.*
 
 ### Step 1 — the plan CI wrote  → **Tab 1**
-- Scroll to the comment **"Terraform plan for cbc0a374"**
+- Scroll to the comment **"Terraform plan for 9da72890"**
 - Click the triangle **plan output** to expand
 
 > "I didn't run this plan. A GitHub Action ran it when I opened the pull
 > request, and posted it back here as a comment."
 
-- Point at the line **Artifact: tfplan-cbc0a374…**
+- Point at the line **Artifact: tfplan-9da72890…**
 
 > "The artifact is named after the commit SHA. That file is what my reviewer
 > approves. Remember it — it matters in ninety seconds."
@@ -89,7 +89,7 @@ Short on time? Cut Topic 14 first, then one of the two Topic 32 demos.
 
 ### Step 4 — fire it  → **TERMINAL**
 ```bash
-gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab -f plan_run_id=32466152247 -f sha=cbc0a3746ffa6db94127353df0706375bfc877af
+gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab -f plan_run_id=32468491504 -f sha=9da72890087d6e95dbf31df09178935132e4a586
 ```
 
 > "Two inputs: which run produced the plan, and which commit it was for."
