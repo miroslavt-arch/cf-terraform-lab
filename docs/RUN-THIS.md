@@ -7,7 +7,7 @@ terminal**. Every step says where you are and exactly what to do.
 
 | Tab | What it is |
 |---|---|
-| **1** | Pull request #3 |
+| **1** | Pull request #1 |
 | **2** | Actions |
 | **3** | Settings → Environments |
 | **4** | Cloudflare DNS records |
@@ -59,13 +59,13 @@ Short on time? Cut Topic 14 first, then one of the two Topic 32 demos.
 *The one with a timer in it. Do it first while everyone is fresh.*
 
 ### Step 1 — the plan CI wrote  → **Tab 1**
-- Scroll to the comment **"Terraform plan for 9da72890"**
+- Scroll to the comment **"Terraform plan for 2277b17d"**
 - Click the triangle **plan output** to expand
 
 > "I didn't run this plan. A GitHub Action ran it when I opened the pull
 > request, and posted it back here as a comment."
 
-- Point at the line **Artifact: tfplan-9da72890…**
+- Point at the line **Artifact: tfplan-2277b17d…**
 
 > "The artifact is named after the commit SHA. That file is what my reviewer
 > approves. Remember it — it matters in ninety seconds."
@@ -89,7 +89,7 @@ Short on time? Cut Topic 14 first, then one of the two Topic 32 demos.
 
 ### Step 4 — fire it  → **TERMINAL**
 ```bash
-gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab -f plan_run_id=32468491504 -f sha=9da72890087d6e95dbf31df09178935132e4a586
+gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab -f plan_run_id=32469271562 -f sha=2277b17df45af3490cb772aa34838674d244793e
 ```
 
 > "Two inputs: which run produced the plan, and which commit it was for."
