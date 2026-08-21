@@ -28,7 +28,7 @@ https://github.com/miroslavt-arch/cf-terraform-lab/pull/2
 3. **Fire the apply:**
    ```bash
    gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab \
-     -f plan_run_id=32465998896 \
+     -f plan_run_id=32466152247 \
      -f sha=cbc0a3746ffa6db94127353df0706375bfc877af
    ```
 
