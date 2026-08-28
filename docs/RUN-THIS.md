@@ -1,4 +1,4 @@
-# RUN THIS — Topics 29, 32, 27
+# RUN THIS — Topics 27, 29, 32
 
 Session on `zesty-beta.sxplab.com` (account `f40b69d8637a12568c6a62d218822384`).
 Three topics, ~45 minutes. Every command below was rehearsed on this exact
@@ -10,18 +10,21 @@ account and zone; the outputs shown are what actually printed.
 - **SEE** = what appears, so you know it worked before you say the line.
 - **IF ASKED** = the questions that come up.
 
-## Order and why
+## Order
 
-| Time | Topic | Why here |
+| Time | Topic | The thread |
 |---|---|---|
 | 0:00 | Opening | Orientation + the safety model |
-| 0:04 | **29** — brownfield adoption | Everyone has a legacy estate; this is the most relatable, and it earns attention |
-| 0:18 | **32** — sharp edges | Three failures on purpose; needs the audience already warmed up |
-| 0:34 | **27** — drift detection | Closes the loop: 32 shows how drift happens, 27 shows how you find it |
+| 0:04 | **27** — drift detection | Your config stops describing production. How do you find out? |
+| 0:16 | **29** — brownfield adoption | And when it was *never* in code — how do you adopt it without breaking it? |
+| 0:30 | **32** — sharp edges | Here's what causes the drift in the first place |
 | 0:45 | Close | The one idea underneath all three |
 
-Running short: drop the second Topic 32 demo (dual writers). Never drop
-Topic 29's gate or Topic 27's exit code — those are the two moments that land.
+Running short: drop Topic 32's dual-writers demo, then its list-scale
+segment. Never drop Topic 27's exit code or Topic 29's gate — those are the
+two moments that land.
+
+---
 
 ## WHICH TERMINAL — read this first
 
@@ -37,9 +40,8 @@ next to the `+` in the terminal panel and choose **Git Bash**. (Or press
 
 **Or standalone:** Start menu → **Git Bash**.
 
-You can tell you're in the right shell: the prompt shows a path with forward
-slashes and ends in `$`, like
-`GRIGS@machine MINGW64 /d/Work/...cf-terraform-lab (main)$`
+You're in the right shell when the prompt shows forward slashes and ends in
+`$`, like `GRIGS@machine MINGW64 /d/Work/...cf-terraform-lab (main)$`.
 PowerShell shows `PS D:\...>` instead.
 
 ## Before you share your screen
@@ -49,8 +51,8 @@ PowerShell shows `PS D:\...>` instead.
 source ~/.cf-lab-env && cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab" && clear
 ```
 
-This loads your tokens and puts you in the repo. If you open a new terminal
-later, run it again.
+This loads your tokens and puts you in the repo. Open a new terminal later?
+Run it again.
 
 Then enlarge the font: Ctrl and `+`, four or five times.
 
@@ -61,7 +63,7 @@ Then enlarge the font: Ctrl and `+`, four or five times.
 | **1** | https://github.com/miroslavt-arch/cf-terraform-lab |
 | **2** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
 
-**GIT BASH — pre-flight. Self-contained, safe to run in a fresh terminal.**
+**GIT BASH — pre-flight. Self-contained, safe in a fresh terminal.**
 ```bash
 source ~/.cf-lab-env && cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
 terraform -chdir=infra/envs/lab plan -input=false 2>&1 | grep -E "No changes|^Plan:"
@@ -71,8 +73,8 @@ terraform test 2>&1 | tail -1
 ```
 Expect exactly: `No changes` · `No changes` · `active` · `5 passed, 0 failed`.
 
-If line 1 or 2 says `Plan: 0 to add, 1 to change` instead, a previous run was
-interrupted — run the RESET block at the bottom of this guide, then re-check.
+If either plan says `Plan: 0 to add, 1 to change` instead, a previous run was
+interrupted — run the RESET block at the bottom, then re-check.
 
 ---
 
@@ -95,11 +97,11 @@ interrupted — run the RESET block at the bottom of this guide, then re-check.
 > state. Nothing is pre-recorded. If something fails, that's a genuine failure
 > and we'll look at it together."
 >
-> "Three topics, and two of them are failures on purpose. In infrastructure
-> code the failure modes *are* the curriculum — anyone can show you a working
-> `terraform apply`. The useful knowledge is what happens when two teams think
-> they own the same resource, or when the API quietly rewrites what you asked
-> for."
+> "Three topics, and the last one is a set of failures on purpose. In
+> infrastructure code the failure modes *are* the curriculum — anyone can show
+> you a working `terraform apply`. The useful knowledge is what happens when
+> two teams think they own the same resource, or when the API quietly rewrites
+> what you asked for."
 
 **DO** — click into `policy`, then `destroy_guard.rego`.
 
@@ -119,12 +121,134 @@ interrupted — run the RESET block at the bottom of this guide, then re-check.
 
 ---
 
-# 0:04 — TOPIC 29 — BROWNFIELD ADOPTION (14 min)
+# 0:04 — TOPIC 27 — DRIFT DETECTION (12 min)
 
-## Frame it first (2 min, no commands)
+## Frame it (2 min, no commands)
 
 **SAY**
 
+> "Start with the thing that goes wrong quietly. You apply your Terraform, it's
+> green, you walk away. And then production starts drifting away from your
+> code."
+>
+> "Someone clicks something during an incident and never comes back to codify
+> it. A vendor changes a default. Another team's pipeline writes to a resource
+> you thought you owned. None of that produces an error anywhere. Two months
+> later you're mid-incident, you open your repo to understand production —
+> and your config has stopped describing it."
+>
+> "So: how do you find out, and how do you find out *who*?"
+
+## Run it
+
+**DO** — **GIT BASH**
+```bash
+bash scripts/demo-27-make-drift.sh
+```
+
+**SEE**
+```
+1/3 - making drift: PATCHing lab-hello's TTL out of band...
+  drifted: ttl -> 900
+2/3 - the detector: plan -detailed-exitcode (exit 2 = drift)...
+exit code 2 - drift detected, exactly as the nightly workflow would see it
+3/3 - rendering to JSON and attributing the author from the audit log...
+
+    Drift report
+    1 resource(s) drifted from code truth:
+    - module.zone_baseline.cloudflare_dns_record.this["lab/lab-hello"]  actions: update
+
+    Audit lookup unavailable (HTTP Error 403). The audit token needs Account
+    Settings: Read in addition to Access: Audit Logs: Read. Detection above
+    is unaffected.
+
+drift healed.
+```
+
+**SAY**
+
+> "Step one made drift — a raw API call changing a TTL, which is exactly what
+> the dashboard does when you click. No Terraform involved."
+>
+> "Step two is the detector, and it's one flag: `terraform plan
+> -detailed-exitcode`. Zero means clean, one means error, **two means drift**.
+> That's the whole mechanism. Your nightly drift detector is a scheduled
+> workflow that runs a plan and checks an exit code — that's it."
+
+**DO** — point at the drifted resource line.
+
+**SAY**
+
+> "Step three is where it gets useful. 'Something changed' is a useless alert
+> — nobody can act on it. So the plan gets rendered to JSON, and every drifted
+> resource is named precisely: module, resource type, the map key. You know
+> exactly which object moved and what kind of change it was."
+>
+> "Then it correlates those resource IDs against the Cloudflare audit log to
+> name the human who did it. That's what turns a nag into a conversation with
+> a specific person about a specific click."
+
+**SAY** — the 403, deliberately and without embarrassment
+
+> "And you can see the attribution isn't wired up on this account. The audit
+> token I have is scoped to a sandbox that got torn down, so Cloudflare
+> returns a 403 — and the script says so plainly, in one line, rather than
+> crashing or pretending. Detection works; the naming needs one permission
+> added to that token. I'd rather show you the honest gap than a screenshot of
+> it working somewhere else."
+
+**DO** — point at `drift healed.`
+
+**SAY**
+
+> "And it put the TTL back, so the demo is repeatable."
+
+## The real point (don't skip this — it's the topic's payoff)
+
+**SAY**
+
+> "Now the thing I actually want you to leave with. **Detection is the
+> consolation prize.**"
+>
+> "If you are detecting drift, it means humans can still write to production.
+> You've accepted a permanent background rate of drift and built a machine to
+> notice it. That's better than not noticing — but it isn't the goal."
+>
+> "The structural fix is removing the ability. In Cloudflare that's changing
+> human dashboard roles to **Administrator Read Only** — people keep full
+> visibility, they lose the pencil — and letting the pipeline's scoped token
+> be the only credential that can write. Then drift isn't detected, it's
+> impossible."
+>
+> "I'm not applying that here for an honest reason: this sandbox login is my
+> only access, and locking myself read-only would end the session. But that's
+> the answer, and detection is what you run while you're negotiating your way
+> toward it."
+
+**IF ASKED**
+
+- *"Why `-refresh-only`?"* — It asks "what changed in the real world?" without
+  proposing to fix it. That's the right question for a detector; a normal plan
+  conflates drift with pending intended changes.
+- *"What does nightly cost?"* — One plan per environment. It's the cheapest
+  safety net in this whole session.
+- *"What if drift is legitimate?"* — Then codify it. The workflow failing is
+  the prompt to make that decision consciously rather than by accident.
+- *"Could you auto-revert it?"* — You can, and people do. Be careful: if the
+  change was a genuine emergency fix, auto-revert undoes it at 3am. Detect,
+  attribute, decide.
+
+---
+
+# 0:16 — TOPIC 29 — BROWNFIELD ADOPTION (14 min)
+
+## Frame it (2 min, no commands)
+
+**SAY**
+
+> "Topic 27 assumed your infrastructure was already in Terraform. Now the
+> harder, more common case: it never was."
+>
 > "Almost nobody starts greenfield. You inherit an estate built by dashboard
 > clicks over five years, by people who have left, and you're asked to bring
 > it under Terraform without an outage."
@@ -140,9 +264,9 @@ interrupted — run the RESET block at the bottom of this guide, then re-check.
 **SAY**
 
 > "These five records are the legacy estate. I made them with raw API calls,
-> the way a dashboard user would — deliberately messy, with TTLs of 120, 240,
-> 360, 480, 600, because real estates are untidy. There's also a rate-limit
-> ruleset. Terraform has never heard of any of it."
+> the way a dashboard user would — deliberately messy, TTLs of 120, 240, 360,
+> 480, 600, because real estates are untidy. There's a rate-limit ruleset too.
+> Terraform has never heard of any of it."
 
 ## Run it
 
@@ -153,12 +277,12 @@ bash scripts/demo-29-adopt.sh
 
 **SAY while it runs**
 
-> "Three techniques here, for three different situations. `cf-terraforming` is
-> for discovery — what's actually out there. Then a single `import` block with
-> `for_each` over a CSV adopts all five records at once; that's the bulk path
-> and it scales to hundreds. Then for the ruleset — a gnarly nested object
-> nobody wants to hand-write — `terraform plan -generate-config-out` makes
-> Terraform write the configuration itself."
+> "Three techniques here, for three different situations. `cf-terraforming`
+> is for discovery — what's actually out there. Then a single `import` block
+> with `for_each` over a CSV adopts all five records at once; that's the bulk
+> path and it scales to hundreds. Then for the ruleset — a gnarly nested
+> object nobody wants to hand-write — `terraform plan -generate-config-out`
+> makes Terraform write the configuration itself."
 >
 > "Generated config is correct but ugly: null optionals, computed attributes
 > echoed back, all noise. A normalizer strips it."
@@ -180,7 +304,7 @@ THE GATE: the next plan must be 'No changes' before anyone refactors
 No changes. Your infrastructure matches the configuration.
 ```
 
-## The payoff (this is the moment — slow down)
+## The payoff (slow down here)
 
 **DO** — point at `0 to change, 0 to destroy`, then at `No changes`.
 
@@ -210,21 +334,24 @@ No changes. Your infrastructure matches the configuration.
   quiet plan is the work, and it's iterative: plan, read the diff, decide
   whether the config or your understanding is wrong, repeat.
 - *"Can I re-run this?"* — Yes. The script clears its own state first, so the
-  import blocks always have something to import. It removes state only; the
-  live resources are untouched.
-- *"What if the plan never goes quiet?"* — Then you've found a field the
-  provider and API disagree on. That's Topic 32, next.
+  import blocks always have something to import. State only; live resources
+  untouched.
+- *"What if the plan never goes quiet?"* — Then you've found a field where the
+  provider and the API disagree. That's the next topic.
 
 ---
 
-# 0:18 — TOPIC 32 — SHARP EDGES (16 min)
+# 0:30 — TOPIC 32 — SHARP EDGES (15 min)
 
 **SAY** — framing
 
+> "Topic 27 was how you notice drift. Topic 29 was how you take control of an
+> estate. This topic is *why the drift happens in the first place*."
+>
 > "Three failures. They look unrelated. They're the same disease at different
 > altitudes, and I'll name it at the end rather than spoil it now."
 
-## 32a — plan noise (6 min)
+## 32a — plan noise (5 min)
 
 **DO** — **GIT BASH**
 ```bash
@@ -254,11 +381,11 @@ plan is QUIET. Code truth now equals API truth, byte for byte.
 > in it."
 >
 > "The real damage isn't cosmetic. You've trained your team to see a non-empty
-> plan and think 'that's just the usual noise'. You've broken the signal. The
-> next real, dangerous diff scrolls past next to the phantom one and gets the
-> same shrug."
+> plan and think 'that's just the usual noise'. You've broken the signal —
+> and remember what we did twenty minutes ago: drift detection is *entirely*
+> built on a plan being trustworthy. Noise here disables Topic 27 completely."
 
-**SAY** — the wrong fix, which everyone reaches for
+**SAY** — the wrong fix everyone reaches for
 
 > "The tempting fix is `ignore_changes` on that attribute. It's worse than the
 > problem. `ignore_changes` doesn't silence the false diff — it tells Terraform
@@ -270,7 +397,7 @@ plan is QUIET. Code truth now equals API truth, byte for byte.
 > "The right fix is boring: write the value in the form the API stores. That's
 > the last line — the plan goes quiet permanently."
 
-**SAY** — the honesty note (worth saying; it builds credibility)
+**SAY** — the honesty note; it builds credibility
 
 > "One thing worth telling you. I originally built this demo around letter
 > case, because that used to be a classic Cloudflare gotcha. Provider version
@@ -280,7 +407,7 @@ plan is QUIET. Code truth now equals API truth, byte for byte.
 > provider version, because they get fixed and you'll end up telling people a
 > story that isn't true anymore."
 
-## 32b — dual writers (5 min)
+## 32b — dual writers (4 min)
 
 **DO** — **GIT BASH**
 ```bash
@@ -305,13 +432,13 @@ A's auto-apply            -> live content: "owned-by-A"
 > explain, and A's auto-apply heals it. Back and forth, forever, both
 > pipelines green, both teams able to prove they configured it correctly."
 >
-> "Nobody errors. Ever. That's what makes this expensive — there's no alert to
-> route, no red build to investigate. And the detection story is interesting:
-> when you dig into the audit log, the actor you find is *the other team's
-> pipeline token*. Drift attributed to a service credential rather than a
-> human almost always means two writers, not a rogue admin."
+> "Nobody errors. Ever. That's what makes this expensive — no alert to route,
+> no red build to investigate. And tie it back to Topic 27: this is *exactly*
+> the drift you'd detect nightly, and when you check the audit log the actor
+> is the other team's pipeline token. Drift attributed to a service credential
+> rather than a human almost always means two writers, not a rogue admin."
 
-## 32c — phase ownership (5 min)
+## 32c — phase ownership (4 min)
 
 **DO** — **GIT BASH**
 ```bash
@@ -333,7 +460,7 @@ Root B claims the SAME phase...
 > apply fails."
 >
 > "I want to argue this loud failure is the *best* outcome of the three. The
-> API refused. Nobody's config silently won. Compare that to the dual-writer
+> API refused. Nobody's config silently won. Compare it to the dual-writer
 > case, where nothing errors for months."
 >
 > "The pathological part is what happens next, and it's social rather than
@@ -363,7 +490,7 @@ Root B claims the SAME phase...
 > seconds. Terraform had to issue five hundred deletes because *you* told it
 > these were five hundred independent resources."
 
-## The synthesis (say this properly — it's the payoff for all three)
+## The synthesis
 
 **SAY**
 
@@ -379,102 +506,23 @@ Root B claims the SAME phase...
 
 ---
 
-# 0:34 — TOPIC 27 — DRIFT DETECTION (11 min)
-
-## Frame it
-
-**SAY**
-
-> "Topic 32 showed you several ways production quietly stops matching your
-> code. This topic is about finding out."
->
-> "Drift is what happens between your applies. Someone clicks something during
-> an incident and doesn't come back to codify it. A vendor changes a default.
-> Another pipeline writes to something you own. Then two months later you're
-> mid-incident and your config has stopped describing production."
-
-**DO** — **GIT BASH**
-```bash
-bash scripts/demo-27-make-drift.sh
-```
-
-**SEE**
-```
-1/3 — making drift: PATCHing lab-hello's TTL out of band...
-  drifted: ttl -> 900
-2/3 — the detector: plan -detailed-exitcode (exit 2 = drift)...
-exit code 2 — drift detected, exactly as the nightly workflow would see it
-3/3 — rendering to JSON and attributing the author from the audit log...
-## Drift report
-**1 resource(s) drifted from code truth:**
-- `module.zone_baseline.cloudflare_dns_record.this["lab/lab-hello"]`  actions: update
-_Audit lookup unavailable (HTTP Error 403). The audit token needs Account
-Settings: Read in addition to Access: Audit Logs: Read. Detection above is
-unaffected._
-drift healed.
-```
-
-**SAY**
-
-> "I just made a change via the API — the same call the dashboard makes when
-> you click. The detector is one flag: `terraform plan -detailed-exitcode`.
-> Zero means clean, one means error, two means drift. That's the whole
-> mechanism. Your drift detector is a scheduled workflow that checks an exit
-> code."
->
-> "But 'something changed' is a useless alert. The question anyone actually
-> asks is *who*, and until you can answer that you can't fix the cause. So the
-> plan gets rendered to JSON and correlated against the Cloudflare audit log
-> to name the actor. That turns a nag into a conversation with a specific
-> person about a specific click."
-
-**SAY** — the 403, out loud, deliberately
-
-> "And you can see the attribution isn't wired up in this lab — the audit
-> token is missing one permission, and the script says so plainly rather than
-> pretending. Detection works; the naming needs `Account Settings: Read` added
-> to that token. I'd rather show you the gap than a screenshot of it working
-> somewhere else."
-
-## The real point
-
-**SAY**
-
-> "Now the thing I actually want you to leave with. Detection is the
-> consolation prize. If you're detecting drift, humans can still write to
-> production. You've accepted a permanent background rate of drift and built a
-> machine to notice it."
->
-> "The structural fix is removing the ability. In Cloudflare that's changing
-> human dashboard roles to **Administrator Read Only** — people keep full
-> visibility, they lose the pencil — and letting the pipeline's scoped token
-> be the only credential that can write. Then drift isn't detected, it's
-> impossible."
->
-> "I'm not applying that here for an honest reason: this sandbox login is my
-> only access, and locking myself read-only would end the session. But that's
-> the answer, and detection is what you run while you're negotiating your way
-> toward it."
-
-**IF ASKED**
-
-- *"Why refresh-only?"* — A refresh-only plan asks "what changed in the real
-  world?" without proposing to fix it. That's the right question for a
-  detector; a normal plan would conflate drift with pending intended changes.
-- *"What does it cost to run nightly?"* — One plan per environment. It's the
-  cheapest safety net in this whole session.
-
----
-
 # 0:45 — CLOSE
 
 **SAY**
 
-> "Three topics, one idea underneath. Topic 29: prove you changed nothing
-> before you touch anything — `0 changed, 0 destroyed`, and the plan goes
-> quiet. Topic 32: every failure was a shared thing with two owners. Topic 27:
-> when ownership does slip, find it fast and name it — and better, take the
-> pencil away so it can't slip."
+> "Three topics, one idea underneath."
+>
+> "We started with drift: production stops matching your code, and the
+> detector is one exit code — but detection is the consolation prize. The real
+> fix is taking the pencil away from humans."
+>
+> "Then adoption: when infrastructure was never in code at all, you prove you
+> changed nothing before you touch anything. Zero changed, zero destroyed, and
+> the plan goes quiet. That sentence is the certificate."
+>
+> "Then the sharp edges — and every one turned out to be a shared thing with
+> two owners. Which is where the drift in topic one came from in the first
+> place."
 >
 > "And the thread through all of it: make the rule executable. A destroy guard
 > that exits non-zero. A gate that reaches 'No changes'. An exit code that
@@ -487,19 +535,45 @@ drift healed.
 
 **GIT BASH**
 ```bash
-source ~/.cf-lab-env
-cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
+source ~/.cf-lab-env && cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
 terraform -chdir=infra/envs/lab apply -auto-approve -input=false >/dev/null
 echo "reset: $(terraform -chdir=infra/envs/lab plan -input=false | grep -cE 'No changes') (1 = clean)"
 ```
 
 Every demo resets itself as its last act:
+- **27** heals the drift it made
 - **29** clears its own state at start-up, so it re-imports every time
 - **32 noise / dual / phase** destroy what they create and delete their state
-- **27** heals the drift it made
 
 The only thing that can be left behind is Topic 27's TTL change if you
 interrupt it mid-run — the `apply` above fixes that.
+
+---
+
+# OPTIONAL — make Topic 27's attribution work (3 min)
+
+Detection works today. The audit-log *naming* needs a token on the current
+account. If you want the full topic:
+
+1. Open this pre-configured link (permissions already selected):
+   https://dash.cloudflare.com/profile/api-tokens?name=lab-audit-ro-v2&accountId=f40b69d8637a12568c6a62d218822384&permissionGroupKeys=%5B%7B%22key%22%3A%22access_audit_log%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%5D
+2. Confirm **Account Resources → Include →** the current account, then
+   **Continue to summary → Create Token**, and copy the value.
+3. **GIT BASH** — paste the token into the env file:
+   ```bash
+   notepad "$(cygpath -w ~/.cf-lab-env)"
+   ```
+   Replace the value of `CLOUDFLARE_AUDIT_TOKEN`, save, close.
+4. **GIT BASH** — verify:
+   ```bash
+   source ~/.cf-lab-env
+   curl -s -H "Authorization: Bearer $CLOUDFLARE_AUDIT_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/logs/audit?since=2026-08-27T00:00:00Z&limit=1" | jq -r 'if .success then "AUDIT OK" else .errors[0].message end'
+   ```
+   `AUDIT OK` means the next `demo-27-make-drift.sh` will print the actor
+   table instead of the 403 line.
+
+If you skip this, the demo still works — the script explains the gap in one
+line and the narration above already handles it.
 
 ---
 
@@ -511,8 +585,9 @@ interrupt it mid-run — the `apply` above fixes that.
 | `command not found: terraform` / `jq` | Same cause — PowerShell, or a Git Bash opened before the tools were installed. Open a fresh Git Bash |
 | `CLOUDFLARE_API_TOKEN: unbound` or 401s | You skipped the setup line. Run `source ~/.cf-lab-env` in this terminal |
 | `No such file or directory: scripts/...` | Wrong directory. Run the setup line, which `cd`s into the repo |
-| Topic 29 errors `resource already managed` | Stale adopt state. The script now clears it automatically; if you're on an older copy, `rm -f brownfield/adopt/terraform.tfstate*` |
+| Pre-flight shows `Plan: 0 to add, 1 to change` | A previous run was interrupted. Run the RESET block |
+| Topic 29 errors `resource already managed` | Stale adopt state. The script clears it automatically now; otherwise `rm -f brownfield/adopt/terraform.tfstate*` |
 | Topic 27 says "drift detected" then "No drift" | Fixed — refresh-only plans record drift under `resource_drift`, not `resource_changes` |
+| Topic 27 shows the 403 audit line | Expected on this account. See the OPTIONAL section above, or narrate it as the honest gap |
 | Topic 32 noise shows no diff | You're on a provider that normalizes the trailing dot. Re-verify before promising it |
-| `zone not found` | `~/.cf-lab-env` still points at a dead sandbox. `LAB_ZONE` must be `zesty-beta.sxplab.com` |
-| Account-level calls 403 | The apply token's account scope is from the previous sandbox. Zone operations are unaffected; only `demo-32-list.sh` and audit attribution need it |
+| Account-level 403s | The apply token's account scope is from the previous sandbox. Zone operations are unaffected; only `demo-32-list.sh` and audit attribution need it |
