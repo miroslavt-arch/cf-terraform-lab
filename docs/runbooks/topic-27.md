@@ -23,21 +23,37 @@ bash scripts/demo-27-make-drift.sh      # end-to-end local version
 gh workflow run drift.yml               # and open the run's job summary
 ```
 
-## Expected output *(unverified until first live run; report contract)*
+## Expected output (REAL, captured 2026-08-28 on zesty-beta.sxplab.com)
 
 ```
-exit code 2 — drift detected, exactly as the nightly workflow would see it
+1/3 - making drift: PATCHing lab-hello's TTL out of band...
+  drifted: ttl -> 900
+2/3 - the detector: plan -detailed-exitcode (exit 2 = drift)...
+exit code 2 - drift detected, exactly as the nightly workflow would see it
+3/3 - rendering to JSON and attributing the author from the audit log...
 
 ## Drift report
 **1 resource(s) drifted from code truth:**
-- `module.zone_baseline.cloudflare_dns_record.this["lab/lab-hello"]` — actions: update
+- `module.zone_baseline.cloudflare_dns_record.this["lab/lab-hello"]`  actions: update
 
-### Who touched what (last 2h of audit log)
-| when | actor | action | resource | id |
-| 2026-08-14T..Z | miroslav.t@incloudites.com | rec_set | dns_record | abc... ⬅ **matches drifted resource** |
+_Audit lookup unavailable (HTTP Error 403). The audit token needs Account
+Settings: Read in addition to Access: Audit Logs: Read. Detection above is
+unaffected._
 
-**Attribution: the marked actor made the out-of-band change.**
+drift healed.
 ```
+
+**Attribution is UNVERIFIED.** The audit-log join has never returned a real
+actor: the `lab-audit-ro` token gets 403 from both `/logs/audit` and
+`/audit_logs`. Adding **Account -> Account Settings -> Read** to that token is
+the documented fix, untested. Detection (exit code 2 + the named resource) is
+fully verified.
+
+### Bug found and fixed 2026-08-28
+The report printed "No drift" immediately after the detector printed "drift
+detected". Cause: `plan -refresh-only` records what changed in the real world
+under `resource_drift`, while `resource_changes` holds intended actions. The
+script read only the latter. It now reads both.
 
 ## Structural prevention (documented — deliberately NOT applied)
 - **Role change that makes humans read-only:** dashboard → Manage account →

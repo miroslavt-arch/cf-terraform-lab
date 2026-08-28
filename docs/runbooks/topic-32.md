@@ -1,5 +1,11 @@
 # Topic 32 — Sharp edges: phase ownership, dual writers, list scale, plan noise
 
+> **Verification status (2026-08-28, zesty-beta.sxplab.com):** phase
+> ownership, dual writers and plan noise all re-verified live on the current
+> account. **List scale is NOT runnable here** — it needs account-level list
+> permissions the current token lacks; the timings below are real measurements
+> from the previous sandbox, quoted as recorded.
+
 **Concept in three sentences.** Four production injuries, reproduced small
 and reversible on `lab-` resources, each with its fix demonstrated. Two are
 ownership fights the API referees differently (phase singleton → hard error;

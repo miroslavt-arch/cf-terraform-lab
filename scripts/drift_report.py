@@ -35,9 +35,7 @@ def audit_events(account_id: str, token: str, hours: int):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 body = json.load(resp)
-            result = body.get("result") or []
-            if result:
-                return result
+            return body.get("result") or []
         except Exception as exc:  # noqa: BLE001 - keep the demo resilient
             last_error = exc
     print(
@@ -46,7 +44,7 @@ def audit_events(account_id: str, token: str, hours: int):
         + "). The audit token needs Account Settings: Read in addition to "
         + "Access: Audit Logs: Read. Detection above is unaffected._"
     )
-    return []
+    return None
 
 
 def normalize(ev):
@@ -118,7 +116,10 @@ def main():
         print("\n_(no CLOUDFLARE_AUDIT_TOKEN / CF_ACCOUNT_ID — cannot attribute)_")
         return
 
-    events = [normalize(e) for e in audit_events(account, token, hours)]
+    raw_events = audit_events(account, token, hours)
+    if raw_events is None:
+        return  # lookup failed; audit_events already printed why
+    events = [normalize(e) for e in raw_events]
     print(f"\n### Who touched what (last {hours}h of audit log)\n")
     if not events:
         print("_audit log returned no events for the window_")

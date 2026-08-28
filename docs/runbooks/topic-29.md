@@ -26,7 +26,7 @@ bash brownfield/seed-legacy.sh     # once: create the mess (raw API, no TF)
 bash scripts/demo-29-adopt.sh      # discover -> import -> generate -> normalize -> GATE
 ```
 
-## Expected output (REAL, captured 2026-08-14)
+## Expected output (REAL, captured 2026-08-28 on zesty-beta.sxplab.com)
 
 ```
 1/4 — planning the CSV-driven import blocks (5 records, ONE import block)...
@@ -52,9 +52,7 @@ altered none of them.
 ### The failure this demo hit while being built (worth telling)
 The first run reported **`5 changed`** — adoption was silently rewriting the
 records. Cause: the seeded TXT content contained an em-dash, and Cloudflare
-stores non-ASCII in TXT as octal escapes (three backslash-escaped
-bytes instead of the character), so the config
-never matched what the API held. The gate caught it. That is exactly what the
+stores non-ASCII in TXT as octal escapes (three backslash-escaped bytes instead of the character), so the config never matched what the API held. The gate caught it. That is exactly what the
 gate is *for*: without it, "adoption" would have quietly edited five live
 records and nobody would have known.
 
