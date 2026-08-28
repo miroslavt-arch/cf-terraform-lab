@@ -2,7 +2,7 @@
 
 **Your job in this session is to RUN things and EXPLAIN them.** Nothing is
 built live. Every command below already works against the real lab zone
-(`gracious-binary.sxplab.com`) — the outputs in the runbooks are what they
+(`zesty-beta.sxplab.com`) — the outputs in the runbooks are what they
 actually printed on 2026-08-14.
 
 Format per block: **RUN** (the command you type) → **SAY** (the point) →
@@ -27,7 +27,7 @@ curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
 docker info >/dev/null && echo "docker up"        # needed only for Topic 14
 ```
 
-Also: open the [Cloudflare dashboard](https://dash.cloudflare.com/bc682468ed596d21ce506ecbae4cb9a4)
+Also: open the [Cloudflare dashboard](https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384)
 and the [repo](https://github.com/miroslavt-arch/cf-terraform-lab) in tabs,
 **un-minimize the Chrome window** (minimized windows can't be screenshared
 cleanly), and set your terminal font large enough to read from the back row.

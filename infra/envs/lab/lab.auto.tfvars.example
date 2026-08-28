@@ -1,6 +1,6 @@
 # Copy to lab.auto.tfvars (gitignored) and fill in. None of these are secrets,
 # but the real file stays out of git so the example is the single reviewed
 # source of truth for its shape.
-account_id    = "bc682468ed596d21ce506ecbae4cb9a4"
-zone_name     = "gracious-binary.sxplab.com"
+account_id    = "f40b69d8637a12568c6a62d218822384"
+zone_name     = "zesty-beta.sxplab.com"
 incident_mode = "none"

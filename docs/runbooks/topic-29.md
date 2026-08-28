@@ -30,7 +30,7 @@ bash scripts/demo-29-adopt.sh      # discover -> import -> generate -> normalize
 
 ```
 1/4 — planning the CSV-driven import blocks (5 records, ONE import block)...
-  # cloudflare_dns_record.legacy["lab-legacy-alpha.lab.gracious-binary.sxplab.com"] will be imported
+  # cloudflare_dns_record.legacy["lab-legacy-alpha.lab.zesty-beta.sxplab.com"] will be imported
   # cloudflare_dns_record.legacy["lab-legacy-bravo...."] will be imported
   # cloudflare_dns_record.legacy["lab-legacy-charlie...."] will be imported
   # cloudflare_dns_record.legacy["lab-legacy-delta...."] will be imported

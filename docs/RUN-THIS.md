@@ -918,7 +918,7 @@ bash scripts/demo-27-make-drift.sh
 ```bash
 source ~/.cf-lab-env
 cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
-zid=9e9f552861413a5b624357be77e3516b
+zid=6fe522935f35ff5b7e1a049c1a90d11e
 rid=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$zid/dns_records?name=lab-ci-demo.lab.$LAB_ZONE" | jq -r '.result[0].id')
 curl -s -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$zid/dns_records/$rid" >/dev/null
 git checkout -- infra/envs/lab/main.tf 2>/dev/null

@@ -24,7 +24,7 @@ name it matched on. Read the list. If anything in it is unfamiliar, stop.
 bash scripts/teardown.sh --execute
 ```
 
-You are asked to type the zone name (`gracious-binary.sxplab.com`) to confirm.
+You are asked to type the zone name (`zesty-beta.sxplab.com`) to confirm.
 Anything else skips that environment.
 
 ## What gets removed

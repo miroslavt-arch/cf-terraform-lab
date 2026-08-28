@@ -2,13 +2,18 @@
 
 A real, runnable lab for teaching ten Terraform × Cloudflare × GitHub topics
 in a 2-hour session. Everything applies against the Cloudflare sandbox
-account **"Operate Cloudflare One lab"** (`bc682468ed596d21ce506ecbae4cb9a4`),
-zone **`gracious-binary.sxplab.com`** (Enterprise plan, verified empty before
-the lab touched it).
+account `f40b69d8637a12568c6a62d218822384`, zone **`zesty-beta.sxplab.com`**.
+
+> **Note (2026-08-21):** the original sandbox (`gracious-binary.sxplab.com`,
+> account `bc682468...`) was destroyed. The lab was repointed to the zone
+> above with no code changes — only `~/.cf-lab-env` and
+> `infra/envs/lab/lab.auto.tfvars`. Captured outputs under `docs/captures/`
+> still name the old zone; they are kept as-is because they are records of
+> runs that actually happened.
 
 ## What this lab creates, and what it costs
 
-Everything is `lab-`-prefixed or lives under `lab.gracious-binary.sxplab.com`:
+Everything is `lab-`-prefixed or lives under `lab.zesty-beta.sxplab.com`:
 
 | Resource | Names | Topic |
 |---|---|---|
@@ -16,7 +21,7 @@ Everything is `lab-`-prefixed or lives under `lab.gracious-binary.sxplab.com`:
 | Zone settings | baseline of 5 (singleton-owned by `zone-baseline`) | 9 |
 | WAF ruleset | `lab-waf-composed` (custom-rules phase) | 10, 11 |
 | Tunnels | `lab-tunnel` (+ `lab-tunnel-g2` during rotation) | 14 |
-| Ruleset | `lab-legacy-headers` (response-header phase) | 29 |
+| Ruleset | `lab-legacy-ratelimit` (rate-limit phase) | 29 |
 | Account lists | `lab_scale_per_item`, `lab_scale_bulk` (demo-lifetime only) | 32 |
 | R2 bucket | `lab-tfstate` (state backend) | — |
 
@@ -64,7 +69,7 @@ free-tier features **only on public repos**.
 ### Step 3 — [YOU] Three Cloudflare API tokens (~10 min)
 
 Dashboard → My Profile → API Tokens → Create Token → Custom token.
-Zone scoping: **Include → Specific zone → gracious-binary.sxplab.com**.
+Zone scoping: **Include → Specific zone → zesty-beta.sxplab.com**.
 
 | # | Name | Permissions | Env var |
 |---|---|---|---|
@@ -83,7 +88,7 @@ Zone scoping: **Include → Specific zone → gracious-binary.sxplab.com**.
 ### Step 5 — [YOU] The env file (~2 min)
 
 ```bash
-printf 'export CLOUDFLARE_ACCOUNT_ID="bc682468ed596d21ce506ecbae4cb9a4"\nexport LAB_ZONE="gracious-binary.sxplab.com"\nexport CLOUDFLARE_API_TOKEN_PLAN=""\nexport CLOUDFLARE_API_TOKEN=""\nexport CLOUDFLARE_AUDIT_TOKEN=""\nexport AWS_ACCESS_KEY_ID=""\nexport AWS_SECRET_ACCESS_KEY=""\n' > ~/.cf-lab-env && chmod 600 ~/.cf-lab-env && notepad "$(cygpath -w ~/.cf-lab-env)"
+printf 'export CLOUDFLARE_ACCOUNT_ID="f40b69d8637a12568c6a62d218822384"\nexport LAB_ZONE="zesty-beta.sxplab.com"\nexport CLOUDFLARE_API_TOKEN_PLAN=""\nexport CLOUDFLARE_API_TOKEN=""\nexport CLOUDFLARE_AUDIT_TOKEN=""\nexport AWS_ACCESS_KEY_ID=""\nexport AWS_SECRET_ACCESS_KEY=""\n' > ~/.cf-lab-env && chmod 600 ~/.cf-lab-env && notepad "$(cygpath -w ~/.cf-lab-env)"
 ```
 
 Paste the four secrets between the quotes **in Notepad** (never into chat,
