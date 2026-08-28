@@ -23,14 +23,36 @@ account and zone; the outputs shown are what actually printed.
 Running short: drop the second Topic 32 demo (dual writers). Never drop
 Topic 29's gate or Topic 27's exit code — those are the two moments that land.
 
+## WHICH TERMINAL — read this first
+
+**Every command in this guide is Git Bash. None of them work in PowerShell.**
+
+If you paste them into PowerShell you get errors like
+`The term 'source' is not recognized...` — that is the only thing wrong; the
+commands are fine, the shell is wrong.
+
+**Open Git Bash in VS Code:** Terminal → New Terminal, then click the **v**
+next to the `+` in the terminal panel and choose **Git Bash**. (Or press
+`` Ctrl+Shift+` `` and pick Git Bash from the dropdown.)
+
+**Or standalone:** Start menu → **Git Bash**.
+
+You can tell you're in the right shell: the prompt shows a path with forward
+slashes and ends in `$`, like
+`GRIGS@machine MINGW64 /d/Work/...cf-terraform-lab (main)$`
+PowerShell shows `PS D:\...>` instead.
+
 ## Before you share your screen
 
-**Terminal:**
+**GIT BASH — run this once. Everything else assumes it has run.**
 ```bash
 source ~/.cf-lab-env && cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab" && clear
 ```
 
-Enlarge the font (Ctrl and `+` four or five times).
+This loads your tokens and puts you in the repo. If you open a new terminal
+later, run it again.
+
+Then enlarge the font: Ctrl and `+`, four or five times.
 
 **Two Chrome tabs, left to right:**
 
@@ -39,14 +61,18 @@ Enlarge the font (Ctrl and `+` four or five times).
 | **1** | https://github.com/miroslavt-arch/cf-terraform-lab |
 | **2** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
 
-**Pre-flight — paste this, expect all four lines green:**
+**GIT BASH — pre-flight. Self-contained, safe to run in a fresh terminal.**
 ```bash
-terraform -chdir=infra/envs/lab plan -input=false | grep -E "No changes|Plan:"
-terraform -chdir=brownfield/adopt plan -input=false -var zone_id=6fe522935f35ff5b7e1a049c1a90d11e -var zone_name=$LAB_ZONE 2>&1 | grep -E "No changes|Plan:"
+source ~/.cf-lab-env && cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
+terraform -chdir=infra/envs/lab plan -input=false 2>&1 | grep -E "No changes|^Plan:"
+terraform -chdir=brownfield/adopt plan -input=false -var zone_id=6fe522935f35ff5b7e1a049c1a90d11e -var zone_name=$LAB_ZONE 2>&1 | grep -E "No changes|^Plan:"
 curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=$LAB_ZONE" | jq -r '.result[0].status'
 terraform test 2>&1 | tail -1
 ```
-Expect: `No changes` · `No changes` · `active` · `5 passed, 0 failed`.
+Expect exactly: `No changes` · `No changes` · `active` · `5 passed, 0 failed`.
+
+If line 1 or 2 says `Plan: 0 to add, 1 to change` instead, a previous run was
+interrupted — run the RESET block at the bottom of this guide, then re-check.
 
 ---
 
@@ -120,7 +146,7 @@ Expect: `No changes` · `No changes` · `active` · `5 passed, 0 failed`.
 
 ## Run it
 
-**DO** — **TERMINAL**
+**DO** — **GIT BASH**
 ```bash
 bash scripts/demo-29-adopt.sh
 ```
@@ -200,7 +226,7 @@ No changes. Your infrastructure matches the configuration.
 
 ## 32a — plan noise (6 min)
 
-**DO** — **TERMINAL**
+**DO** — **GIT BASH**
 ```bash
 bash scripts/demo-32-noise.sh
 ```
@@ -256,7 +282,7 @@ plan is QUIET. Code truth now equals API truth, byte for byte.
 
 ## 32b — dual writers (5 min)
 
-**DO** — **TERMINAL**
+**DO** — **GIT BASH**
 ```bash
 bash scripts/demo-32-dual.sh
 ```
@@ -287,7 +313,7 @@ A's auto-apply            -> live content: "owned-by-A"
 
 ## 32c — phase ownership (5 min)
 
-**DO** — **TERMINAL**
+**DO** — **GIT BASH**
 ```bash
 bash scripts/demo-32-phase.sh
 ```
@@ -367,7 +393,7 @@ Root B claims the SAME phase...
 > Another pipeline writes to something you own. Then two months later you're
 > mid-incident and your config has stopped describing production."
 
-**DO** — **TERMINAL**
+**DO** — **GIT BASH**
 ```bash
 bash scripts/demo-27-make-drift.sh
 ```
@@ -459,6 +485,7 @@ drift healed.
 
 # RESET — before delivering again
 
+**GIT BASH**
 ```bash
 source ~/.cf-lab-env
 cd "D:/Work/Claude/Shared Subnet Diagram/cf-terraform-lab"
@@ -480,6 +507,10 @@ interrupt it mid-run — the `apply` above fixes that.
 
 | Symptom | Cause and fix |
 |---|---|
+| `The term 'source' is not recognized` | **You are in PowerShell.** Switch the terminal to Git Bash and re-run. Nothing is broken |
+| `command not found: terraform` / `jq` | Same cause — PowerShell, or a Git Bash opened before the tools were installed. Open a fresh Git Bash |
+| `CLOUDFLARE_API_TOKEN: unbound` or 401s | You skipped the setup line. Run `source ~/.cf-lab-env` in this terminal |
+| `No such file or directory: scripts/...` | Wrong directory. Run the setup line, which `cd`s into the repo |
 | Topic 29 errors `resource already managed` | Stale adopt state. The script now clears it automatically; if you're on an older copy, `rm -f brownfield/adopt/terraform.tfstate*` |
 | Topic 27 says "drift detected" then "No drift" | Fixed — refresh-only plans record drift under `resource_drift`, not `resource_changes` |
 | Topic 32 noise shows no diff | You're on a provider that normalizes the trailing dot. Re-verify before promising it |
