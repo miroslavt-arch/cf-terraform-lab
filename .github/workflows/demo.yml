@@ -47,29 +47,12 @@ jobs:
           terraform_version: "1.15.8"
           terraform_wrapper: false
 
-      - name: prepare the lab environment (only Topic 27 needs it)
-        if: startsWith(inputs.topic, 'topic-27')
-        run: |
-          cat > infra/envs/lab/lab.auto.tfvars <<EOF
-          account_id    = "${{ vars.CF_ACCOUNT_ID }}"
-          zone_name     = "${{ vars.LAB_ZONE }}"
-          incident_mode = "none"
-          enable_tunnel = false
-          EOF
-          # This repo pins an R2 backend for local use. CI has no R2 creds and
-          # the run is ephemeral, so drop the backend block and use local state.
-          sed -i '/backend "s3" {}/d' infra/envs/lab/versions.tf
-          terraform -chdir=infra/envs/lab init -input=false
-          # Bring the live estate into this fresh state, so the drift the demo
-          # creates is measured against the real baseline.
-          terraform -chdir=infra/envs/lab apply -auto-approve -input=false
-
       - name: run the demo
         id: run
         run: |
           set -o pipefail
           case "${{ inputs.topic }}" in
-            topic-27-drift-detection)    SCRIPT=scripts/demo-27-make-drift.sh ;;
+            topic-27-drift-detection)    SCRIPT=scripts/ci-demo-27-drift.sh ;;
             topic-29-brownfield-adoption)
               bash brownfield/seed-legacy.sh 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a /tmp/out.txt
               SCRIPT=scripts/demo-29-adopt.sh ;;
