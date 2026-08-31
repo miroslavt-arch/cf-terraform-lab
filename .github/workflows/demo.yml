@@ -1,0 +1,97 @@
+# Run any lab topic from the GitHub Actions console.
+#
+# Actions -> "demo (run a topic)" -> Run workflow -> pick a topic.
+# Output is written to the job summary so it is readable in the browser,
+# then you refresh the Cloudflare dashboard to see the effect.
+#
+# Runs in the lab-apply environment: the write token lives there behind the
+# reviewer gate, so even a demo run is approved before it gets a credential.
+name: demo (run a topic)
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Which topic to demonstrate"
+        required: true
+        type: choice
+        default: topic-27-drift-detection
+        options:
+          - topic-27-drift-detection
+          - topic-29-brownfield-adoption
+          - topic-32-plan-noise
+          - topic-32-dual-writers
+          - topic-32-phase-ownership
+
+permissions:
+  contents: read
+
+jobs:
+  demo:
+    name: ${{ inputs.topic }}
+    runs-on: ubuntu-latest
+    environment: lab-apply
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_AUDIT_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+      CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+      LAB_ZONE: ${{ vars.LAB_ZONE }}
+      TF_VAR_account_id: ${{ vars.CF_ACCOUNT_ID }}
+      TF_VAR_zone_name: ${{ vars.LAB_ZONE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+
+      - name: prepare the lab environment (state + tfvars)
+        run: |
+          cat > infra/envs/lab/lab.auto.tfvars <<EOF
+          account_id    = "${{ vars.CF_ACCOUNT_ID }}"
+          zone_name     = "${{ vars.LAB_ZONE }}"
+          incident_mode = "none"
+          enable_tunnel = false
+          EOF
+          cat > infra/envs/lab/backend_override.tf <<'EOF'
+          terraform { backend "local" {} }
+          EOF
+          terraform -chdir=infra/envs/lab init -input=false >/dev/null
+          # Adopt the live estate into a fresh state so drift demos have a baseline.
+          terraform -chdir=infra/envs/lab apply -auto-approve -input=false >/dev/null 2>&1 || true
+
+      - name: run the demo
+        id: run
+        run: |
+          set -o pipefail
+          case "${{ inputs.topic }}" in
+            topic-27-drift-detection)    SCRIPT=scripts/demo-27-make-drift.sh ;;
+            topic-29-brownfield-adoption)
+              bash brownfield/seed-legacy.sh 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a /tmp/out.txt
+              SCRIPT=scripts/demo-29-adopt.sh ;;
+            topic-32-plan-noise)         SCRIPT=scripts/demo-32-noise.sh ;;
+            topic-32-dual-writers)       SCRIPT=scripts/demo-32-dual.sh ;;
+            topic-32-phase-ownership)    SCRIPT=scripts/demo-32-phase.sh ;;
+          esac
+          echo "running $SCRIPT"
+          bash "$SCRIPT" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a /tmp/out.txt
+
+      - name: publish the output to the job summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ inputs.topic }}"
+            echo ""
+            echo "Zone: \`${{ vars.LAB_ZONE }}\`  ·  run by @${{ github.actor }}"
+            echo ""
+            echo '```'
+            cat /tmp/out.txt 2>/dev/null || echo "(no output captured)"
+            echo '```'
+            echo ""
+            echo "Now refresh the Cloudflare dashboard to see the effect:"
+            echo ""
+            echo "- [DNS records](https://dash.cloudflare.com/${{ vars.CF_ACCOUNT_ID }}/${{ vars.LAB_ZONE }}/dns/records)"
+            echo "- [Security rules](https://dash.cloudflare.com/${{ vars.CF_ACCOUNT_ID }}/${{ vars.LAB_ZONE }}/security/security-rules)"
+          } >> "$GITHUB_STEP_SUMMARY"
