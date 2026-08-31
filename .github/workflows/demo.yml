@@ -47,7 +47,8 @@ jobs:
           terraform_version: "1.15.8"
           terraform_wrapper: false
 
-      - name: prepare the lab environment (state + tfvars)
+      - name: prepare the lab environment (only Topic 27 needs it)
+        if: startsWith(inputs.topic, 'topic-27')
         run: |
           cat > infra/envs/lab/lab.auto.tfvars <<EOF
           account_id    = "${{ vars.CF_ACCOUNT_ID }}"
@@ -55,12 +56,13 @@ jobs:
           incident_mode = "none"
           enable_tunnel = false
           EOF
-          cat > infra/envs/lab/backend_override.tf <<'EOF'
-          terraform { backend "local" {} }
-          EOF
-          terraform -chdir=infra/envs/lab init -input=false >/dev/null
-          # Adopt the live estate into a fresh state so drift demos have a baseline.
-          terraform -chdir=infra/envs/lab apply -auto-approve -input=false >/dev/null 2>&1 || true
+          # This repo pins an R2 backend for local use. CI has no R2 creds and
+          # the run is ephemeral, so drop the backend block and use local state.
+          sed -i '/backend "s3" {}/d' infra/envs/lab/versions.tf
+          terraform -chdir=infra/envs/lab init -input=false
+          # Bring the live estate into this fresh state, so the drift the demo
+          # creates is measured against the real baseline.
+          terraform -chdir=infra/envs/lab apply -auto-approve -input=false
 
       - name: run the demo
         id: run
