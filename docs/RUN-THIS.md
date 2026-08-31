@@ -56,12 +56,34 @@ Run it again.
 
 Then enlarge the font: Ctrl and `+`, four or five times.
 
-**Two Chrome tabs, left to right:**
+**Three Chrome tabs, left to right:**
 
 | Tab | URL |
 |---|---|
 | **1** | https://github.com/miroslavt-arch/cf-terraform-lab |
-| **2** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
+| **2** | https://github.com/miroslavt-arch/cf-terraform-lab/actions/workflows/demo.yml |
+| **3** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
+
+## TWO WAYS TO RUN EVERY TOPIC
+
+Each topic can be driven either way. Pick one and stay consistent — mixing
+them mid-session is how you lose the thread.
+
+**A — from the GitHub console (recommended when presenting).** Tab 2 →
+**Run workflow** → choose the topic → **Run workflow**. The job pauses at the
+`lab-apply` gate; click **Review deployments → lab-apply → Approve and
+deploy**. Output renders in the job summary, with links straight into the
+Cloudflare dashboard.
+
+That approval step is worth narrating rather than apologising for: *"even my
+demo runs don't get a write credential until a human approves them."*
+
+**B — from Git Bash.** The commands under each topic. Faster, no approval
+click, but the audience watches a terminal instead of a console.
+
+The two produce the same result. Topic 27 uses a slightly different script in
+CI (`ci-demo-27-drift.sh`) because a runner has no local Terraform state — it
+creates its own record, drifts it, detects, heals and cleans up.
 
 **GIT BASH — pre-flight. Self-contained, safe in a fresh terminal.**
 ```bash
@@ -141,7 +163,10 @@ interrupted — run the RESET block at the bottom, then re-check.
 
 ## Run it
 
-**DO** — **GIT BASH**
+**DO — option A, GitHub console:** Tab 2 → Run workflow →
+`topic-27-drift-detection` → approve at the gate.
+
+**DO — option B, GIT BASH:**
 ```bash
 bash scripts/demo-27-make-drift.sh
 ```
@@ -259,7 +284,7 @@ drift healed.
 > State-only operations. If adoption changes anything, adoption failed — you
 > didn't adopt the estate, you overwrote it with your guess about the estate."
 
-**DO** — **Tab 2** (Cloudflare DNS). Point at the five `lab-legacy-*` records.
+**DO** — **Tab 3** (Cloudflare DNS). Point at the five `lab-legacy-*` records.
 
 **SAY**
 
@@ -270,7 +295,11 @@ drift healed.
 
 ## Run it
 
-**DO** — **GIT BASH**
+**DO — option A, GitHub console:** Tab 2 → Run workflow →
+`topic-29-brownfield-adoption` → approve at the gate. (The workflow seeds the
+legacy estate first, so it works from a clean zone.)
+
+**DO — option B, GIT BASH:**
 ```bash
 bash scripts/demo-29-adopt.sh
 ```
@@ -353,7 +382,10 @@ No changes. Your infrastructure matches the configuration.
 
 ## 32a — plan noise (5 min)
 
-**DO** — **GIT BASH**
+**DO — option A, GitHub console:** Tab 2 → Run workflow →
+`topic-32-plan-noise` → approve at the gate.
+
+**DO — option B, GIT BASH:**
 ```bash
 bash scripts/demo-32-noise.sh
 ```
@@ -409,7 +441,10 @@ plan is QUIET. Code truth now equals API truth, byte for byte.
 
 ## 32b — dual writers (4 min)
 
-**DO** — **GIT BASH**
+**DO — option A, GitHub console:** Tab 2 → Run workflow →
+`topic-32-dual-writers` → approve at the gate.
+
+**DO — option B, GIT BASH:**
 ```bash
 bash scripts/demo-32-dual.sh
 ```
@@ -440,7 +475,10 @@ A's auto-apply            -> live content: "owned-by-A"
 
 ## 32c — phase ownership (4 min)
 
-**DO** — **GIT BASH**
+**DO — option A, GitHub console:** Tab 2 → Run workflow →
+`topic-32-phase-ownership` → approve at the gate.
+
+**DO — option B, GIT BASH:**
 ```bash
 bash scripts/demo-32-phase.sh
 ```
