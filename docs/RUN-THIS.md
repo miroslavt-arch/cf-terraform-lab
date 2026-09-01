@@ -1,8 +1,11 @@
-# RUN THIS — Topics 27, 29, 32
+# RUN THIS — the lab, end to end
 
 Session on `zesty-beta.sxplab.com` (account `f40b69d8637a12568c6a62d218822384`).
-Three topics, ~45 minutes. Every command below was rehearsed on this exact
-account and zone; the outputs shown are what actually printed.
+
+**Every one of the ten topics runs from the GitHub Actions console**, and all
+twelve menu entries have been verified green on this exact account. The
+detailed walkthrough below covers Topics 27, 29 and 32 — the three built for
+this session — and the full menu after it lets you take any question anywhere.
 
 - **DO** = a click or a paste.
 - **SAY** = narration. Written to be spoken, not read aloud — it's the
@@ -64,32 +67,42 @@ Then enlarge the font: Ctrl and `+`, four or five times.
 | **2** | https://github.com/miroslavt-arch/cf-terraform-lab/actions/workflows/demo.yml |
 | **3** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
 
-## THE FULL TOPIC MENU (Actions → demo → Run workflow)
+## THE FULL TOPIC MENU (Actions → demo (run a topic) → Run workflow)
 
-All twelve entries run from the GitHub console. The three this session covers
-are marked ★; the rest are there so you can take any question anywhere.
+All twelve entries verified green on this account. ★ = covered in detail below.
 
-| Menu entry | What it shows | Live? |
-|---|---|---|
-| `topic-07-module-design` | validation fires at plan time with the module's own message | offline |
-| `topic-09-singleton-ownership` | two roots flap one zone setting, both green | live |
-| `topic-10-waf-composition` | per-team fragment lint blocks a `skip` action | offline |
-| `topic-11-kill-switch` | arms + disarms the live incident rules, timed | live |
-| `topic-14-tunnel-design-walkthrough` | design walkthrough — verified against module source | code only |
-| `topic-20-stale-plan-invariant` | `Saved plan is stale` refusal | live |
-| `topic-24-terraform-test` | 5 mocked tests, no credentials | offline |
-| ★ `topic-27-drift-detection` | exit code 2, resource named, healed | live |
-| ★ `topic-29-brownfield-adoption` | 5 imported, 0 changed, gate reaches No changes | live |
-| ★ `topic-32-plan-noise` | the never-settling plan | live |
-| ★ `topic-32-dual-writers` | two roots, one record, forever-flap | live |
-| ★ `topic-32-phase-ownership` | API refuses the second claimant | live |
+| Menu entry | Topic | What the audience sees | Needs |
+|---|---|---|---|
+| `topic-07-module-design` | 7 | validation fires at plan time with the module's own message | nothing |
+| `topic-09-singleton-ownership` | 9 | two roots flap one zone setting, both pipelines green | write token |
+| `topic-10-waf-composition` | 10 | per-team fragment lint blocks a `skip` action | nothing |
+| `topic-11-kill-switch` | 11 | arms then disarms the live incident rules, timed | write token |
+| `topic-14-tunnel-design-walkthrough` | 14 | design walkthrough, checked against module source | nothing |
+| `topic-20-stale-plan-invariant` | 20 | the `Saved plan is stale` refusal | write token |
+| `topic-24-terraform-test` | 24 | 5 mocked tests, no credentials, sub-second | nothing |
+| ★ `topic-27-drift-detection` | 27 | exit code 2, resource named, drift healed | write token |
+| ★ `topic-29-brownfield-adoption` | 29 | 5 imported, 0 changed, gate reaches No changes | write token |
+| ★ `topic-32-plan-noise` | 32 | the never-settling plan | write token |
+| ★ `topic-32-dual-writers` | 32 | two roots, one record, forever-flap | write token |
+| ★ `topic-32-phase-ownership` | 32 | API refuses the second claimant | write token |
 
-Topic 14 cannot run: the lab token can read tunnels but not create them, and
-the HA demo needs two local containers. Its job prints the design and the real
-module code rather than faking a run — say that out loud if it comes up.
+**Three of these are CI-native variants**, because a runner has no local
+Terraform state:
 
-Topic 20's *full* human-gate demo is the `tf-pr` / `tf-apply` pipeline itself
-(open a PR, watch the gate). The menu entry covers the invariant underneath it.
+- **11** imports the live `lab-waf-composed` ruleset into an ephemeral state,
+  flips `incident_mode`, flips it back, then `state rm` — never `destroy`,
+  because that object belongs to `infra/envs/lab`.
+- **20** owns one record end to end to reproduce the stale-plan refusal.
+- **27** creates its own record rather than drifting one `envs/lab` owns.
+
+**Topic 14 cannot run live** — the lab token can read tunnels but not create
+them, and the HA demo needs two local containers. Its job prints the design
+and the real module code instead of faking a run. Say that out loud if asked;
+it is a better answer than a screenshot.
+
+**Topic 20's full human-gate demo is the pipeline itself** — open a PR and
+watch `tf-pr` plan, then `tf-apply` pause at the gate. The menu entry covers
+the invariant underneath it.
 
 ## TWO WAYS TO RUN EVERY TOPIC
 
