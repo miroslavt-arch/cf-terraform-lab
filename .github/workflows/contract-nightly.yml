@@ -4,6 +4,18 @@
 name: contract-tests
 
 on:
+  # Tier two runs NIGHTLY and on demand - never on PRs, where tier one's
+  # mocked tests already cover the logic offline.
+  #
+  # Note the real tension this exposes: these tests need a write token, and the
+  # only place the write token lives is the lab-apply environment, which
+  # requires human approval (Topic 20). So a scheduled run QUEUES for approval
+  # rather than running unattended. That is a genuine trade-off, not an
+  # oversight: unattended write automation and a human gate on writes are in
+  # direct conflict, and you resolve it by giving CI its own narrowly-scoped
+  # credential rather than by removing the gate.
+  schedule:
+    - cron: "42 2 * * *"
   workflow_dispatch: {}
 
 permissions:

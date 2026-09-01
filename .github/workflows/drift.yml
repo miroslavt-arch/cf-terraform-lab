@@ -1,63 +1,92 @@
 # Topic 27 — nightly drift baseline with author attribution.
-# plan -detailed-exitcode: 0 = clean, 1 = error, 2 = DRIFT. On 2 we render the
-# drift to JSON, correlate with the Cloudflare audit log, and name the actor
-# in the job summary — then fail loudly so the drift is impossible to miss.
+#
+# Drift = live Cloudflare no longer matches the committed code.
+#
+# This lab has no remote Terraform state, so a runner cannot compare against
+# "the state at last apply". It does something arguably better: it IMPORTS the
+# live objects into an ephemeral state and compares them to the code as
+# committed. Anything the plan proposes beyond the import itself is drift.
+#
+# Clean run  -> every resource_change is `no-op`      -> exit 0, silent
+# Dirty run  -> at least one update/create/delete      -> report + fail loudly
 name: drift
 
 on:
+  # The topic teaches an UNATTENDED detector. A detector you have to remember
+  # to click is not a detector.
+  schedule:
+    - cron: "17 3 * * *"          # nightly, 03:17 UTC
   workflow_dispatch:
     inputs:
-      target:
-        description: "Optional -target=... address for a focused drift check"
+      environment:
+        description: "Which environment root to check"
         required: false
-        default: ""
+        default: "ci-waf"
 
 permissions:
   contents: read
 
 jobs:
   drift:
-    name: detect drift (envs/lab)
+    # PER ENVIRONMENT. One entry today; adding envs/staging is a one-line
+    # change here rather than a whole new job.
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [ci-waf]
+    name: detect drift (envs/${{ matrix.environment }})
     runs-on: ubuntu-latest
-    environment: lab-plan          # read-only token is enough to see drift
+    environment: lab-plan          # read-only token is enough to SEE drift
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PLAN }}
       CLOUDFLARE_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_AUDIT_TOKEN }}
       CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      TF_VAR_account_id: ${{ vars.CF_ACCOUNT_ID }}
-      TF_VAR_zone_name: ${{ vars.LAB_ZONE }}
-      TF_VAR_incident_mode: ${{ vars.INCIDENT_MODE || 'none' }}
-    defaults:
-      run:
-        working-directory: infra/envs/lab
+      LAB_ZONE: ${{ vars.LAB_ZONE }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.15.8"
           terraform_wrapper: false   # we need the raw exit code
-      - name: init (R2 backend)
-        run: terraform init -input=false -backend-config=../../backends/lab.s3.tfbackend
-      - name: plan -detailed-exitcode
+
+      - name: locate the live objects to compare against
+        id: ids
+        run: |
+          zid=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$LAB_ZONE" | jq -r '.result[0].id')
+          rs=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/$zid/rulesets?per_page=50" \
+            | jq -r '.result[]|select(.name=="lab-waf-composed")|.id')
+          [ -n "$rs" ] || { echo "::error::lab-waf-composed not found on $LAB_ZONE"; exit 1; }
+          echo "ruleset_id=$rs" >> "$GITHUB_OUTPUT"
+
+      - name: plan the live estate against the committed code
         id: plan
+        working-directory: infra/envs/${{ matrix.environment }}
         run: |
-          set +e
-          terraform plan -input=false -no-color -detailed-exitcode -refresh-only \
-            ${{ inputs.target != '' && format('-target={0}', inputs.target) || '' }} \
-            -out=drift.tfplan | tee drift.txt
-          code=${PIPESTATUS[0]}
-          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" = "1" ]; then exit 1; fi
-          exit 0
-      - name: render drift to JSON + attribute the author
-        if: steps.plan.outputs.exitcode == '2'
-        run: |
+          terraform init -input=false
+          terraform plan -input=false -no-color \
+            -var "zone_name=$LAB_ZONE" \
+            -var "ruleset_id=${{ steps.ids.outputs.ruleset_id }}" \
+            -out=drift.tfplan
           terraform show -json drift.tfplan > drift.json
-          python ../../../scripts/drift_report.py drift.json | tee -a "$GITHUB_STEP_SUMMARY"
+          # Anything beyond the import itself is drift.
+          n=$(jq '[.resource_changes[]? | select(.change.actions | (index("update") or index("create") or index("delete")))] | length' drift.json)
+          echo "drifted=$n" >> "$GITHUB_OUTPUT"
+          echo "drifted resources: $n"
+
+      - name: report and attribute
+        if: steps.plan.outputs.drifted != '0'
+        working-directory: infra/envs/${{ matrix.environment }}
+        run: python ../../../scripts/drift_report.py drift.json --hours 24 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: clean run
+        if: steps.plan.outputs.drifted == '0'
+        run: echo "No drift - live matches the committed code." | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: fail loudly on drift
-        if: steps.plan.outputs.exitcode == '2'
+        if: steps.plan.outputs.drifted != '0'
         run: |
-          echo "::error::DRIFT DETECTED in envs/lab — see job summary for the actor attribution"
+          echo "::error::DRIFT DETECTED in envs/${{ matrix.environment }} - see the job summary for attribution"
           exit 1

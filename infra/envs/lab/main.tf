@@ -15,10 +15,14 @@ locals {
 }
 
 # Topics 7 & 9 — settings baseline + lab DNS records.
-# NOTE (Topic 7): source will move to a git tag ref (?ref=v0.1.0) the moment
-# the public repo exists — pinning by tag is part of the demo.
+#
+# Topic 7: this consumer pins a GIT TAG, not a branch and not a relative path.
+# Pointing at a branch would mean this environment changes whenever someone
+# else pushes; pointing at a path would mean there is no version to pin at all.
+# The upgrade to v0.2.0 is a one-line diff on the ref below - which is exactly
+# what makes it reviewable.
 module "zone_baseline" {
-  source = "../../modules/zone-baseline"
+  source = "git::https://github.com/miroslavt-arch/cf-terraform-lab.git//infra/modules/zone-baseline?ref=v0.1.0"
 
   zones = {
     lab = {
