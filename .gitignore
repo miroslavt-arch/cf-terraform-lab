@@ -43,3 +43,9 @@ brownfield/adopt/imports_ruleset.tf
 
 # Local backend override (dev only; R2 is the real backend)
 *_override.tf
+
+# cf-terraforming copies a ~120MB terraform binary into cwd unless
+# --terraform-binary-path is passed. Match the bare name only - do NOT add a
+# negation for terraform.tfstate here, it would override the state rules above.
+/terraform
+**/terraform

@@ -21,10 +21,32 @@ rm -f "$adopt"/terraform.tfstate "$adopt"/terraform.tfstate.backup       "$adopt
 
 say "Topic 29: resources Terraform has NEVER seen -> a clean no-op plan, without touching the live estate"
 
-note "0/4 — capturing the 'before' truth: what does cf-terraforming see?"
-cf-terraforming generate --resource-type cloudflare_dns_record --zone "$zone_id" \
-  --token "$CLOUDFLARE_API_TOKEN" 2>/dev/null | grep -E "resource|name.*lab-legacy" | head -12 \
-  || note "(cf-terraforming generate preview unavailable — continuing with import blocks)"
+note "0/4 - DISCOVERY: what does cf-terraforming see that Terraform does not?"
+# cf-terraforming is the discovery tool: point it at a live zone and it emits
+# HCL for what is actually there. Report honestly whether it worked - a silent
+# fallback lets a broken discovery step look like a successful one.
+# NOTE: `env -u CLOUDFLARE_ACCOUNT_ID`. cf-terraforming v0.28 reads that
+# variable from the environment and then refuses it alongside --zone:
+# "--account and --zone are mutually exclusive". common.sh exports it, so
+# without this the discovery step fails on every machine that sourced the
+# lab env - which is every machine.
+# Resolve terraform in the form cf-terraforming expects. On Git Bash it needs
+# a native Windows path; the MSYS form (/c/Users/...) is reported not found.
+TF_BIN="$(command -v terraform)"
+command -v cygpath >/dev/null 2>&1 && TF_BIN="$(cygpath -w "$TF_BIN")"
+
+# --terraform-binary-path matters: without it cf-terraforming installs its own
+# ~120MB terraform binary into the CURRENT DIRECTORY, which then shows up as an
+# untracked file in the repo.
+if cfout=$(env -u CLOUDFLARE_ACCOUNT_ID cf-terraforming generate              --resource-type cloudflare_dns_record              --terraform-binary-path "$TF_BIN"              --zone "$zone_id" --token "$CLOUDFLARE_API_TOKEN" 2>/tmp/cft-err.txt); then
+  echo "$cfout" | grep -E "^resource|lab-legacy" | head -12
+  green "cf-terraforming emitted HCL for the live records above. That is DISCOVERY;"
+  green "the adoption below uses import blocks, which is the bulk path."
+else
+  red "cf-terraforming generate FAILED - discovery unavailable on this account:"
+  sed 's/^/    /' /tmp/cft-err.txt | head -3
+  note "Continuing: the import blocks below do not depend on it."
+fi
 
 terraform init -input=false >/dev/null 2>&1 || terraform init -input=false
 
@@ -57,11 +79,19 @@ note "4/4 — applying the imports (state-only; the LIVE resources are untouched
 terraform apply -auto-approve -input=false -var "zone_id=$zone_id" -var "zone_name=$LAB_ZONE" | grep -E "Imported|Apply"
 
 say "THE GATE: the next plan must be 'No changes' before anyone refactors"
-terraform plan -input=false -no-color -detailed-exitcode -var "zone_id=$zone_id" -var "zone_name=$LAB_ZONE" \
-  | tail -5 | tee /tmp/adopt-after.txt
-code=${PIPESTATUS[0]}
+# set +e here on purpose: -detailed-exitcode returns 2 when changes are pending,
+# and under `set -euo pipefail` that would abort the script before the failure
+# branch below could ever run - so the gate could only ever report success.
+set +e
+terraform plan -input=false -no-color -detailed-exitcode   -var "zone_id=$zone_id" -var "zone_name=$LAB_ZONE" > /tmp/adopt-after.txt 2>&1
+code=$?
+set -e
+tail -5 /tmp/adopt-after.txt
 if [ "$code" = "0" ]; then
-  green "No changes — adoption is complete and provably non-destructive. NOW you may refactor."
+  green "No changes - adoption is complete and provably non-destructive. NOW you may refactor."
 else
-  red "plan is not quiet yet (exit $code) — normalize further; do NOT refactor from here"
+  red "PLAN IS NOT QUIET (exit $code). Adoption has NOT converged."
+  red "Do NOT refactor from here - normalize the config until this plan is empty."
+  red "Every difference above is a live resource this config would rewrite."
+  exit 1
 fi

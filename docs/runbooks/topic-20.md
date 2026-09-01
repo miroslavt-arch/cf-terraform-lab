@@ -17,11 +17,11 @@ process discipline.
 - `scripts/demo-20-stale-plan.sh` — the local, deterministic reproduction
 
 ## One-time setup (Settings → Environments — ~5 min)
-1. **`lab-plan`** — secrets `CLOUDFLARE_API_TOKEN_PLAN`,
-   `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `CLOUDFLARE_AUDIT_TOKEN`.
+1. **`lab-plan`** — secrets `CLOUDFLARE_API_TOKEN_PLAN` and
+   `CLOUDFLARE_AUDIT_TOKEN`. (No R2/AWS creds: this lab runs without a remote
+   backend - see the note in `infra/envs/ci-demo/versions.tf`.)
    No protection rules (planning is safe by token construction).
-2. **`lab-apply`** — secrets `CLOUDFLARE_API_TOKEN`, `AWS_ACCESS_KEY_ID`,
-   `AWS_SECRET_ACCESS_KEY`. Protection: **Required reviewers →
+2. **`lab-apply`** — secret `CLOUDFLARE_API_TOKEN`. Protection: **Required reviewers →
    miroslavt-arch**; **Wait timer → 1 minute** (long enough to SEE in a demo).
 3. Repo variables: `CF_ACCOUNT_ID`, `LAB_ZONE`, `LAB_ZONE_ID`.
 

@@ -116,10 +116,8 @@ rules present but disabled). Expected: ~7 adds, 0 changes, **0 destroys**.
 ### Step 8 — [YOU, ~5 min] GitHub environments (Topic 20)
 
 Repo → Settings → Environments:
-- `lab-plan` — secrets: `CLOUDFLARE_API_TOKEN_PLAN`, `AWS_ACCESS_KEY_ID`,
-  `AWS_SECRET_ACCESS_KEY`, `CLOUDFLARE_AUDIT_TOKEN`
-- `lab-apply` — secrets: `CLOUDFLARE_API_TOKEN`, `AWS_ACCESS_KEY_ID`,
-  `AWS_SECRET_ACCESS_KEY`; protection: **Required reviewers = you**,
+- `lab-plan` — secrets: `CLOUDFLARE_API_TOKEN_PLAN`, `CLOUDFLARE_AUDIT_TOKEN`
+- `lab-apply` — secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_AUDIT_TOKEN`; protection: **Required reviewers = you**,
   **Wait timer = 1 minute**
 - Repo-level variables: `CF_ACCOUNT_ID`, `LAB_ZONE`, `LAB_ZONE_ID`
 

@@ -55,7 +55,15 @@ else
       "ratelimit": {"characteristics": ["ip.src", "cf.colo.id"], "period": 60,
                     "requests_per_period": 100, "mitigation_timeout": 60}
     }]
-  }' | jq -r '.result.id')
+  }' | jq -r '.result.id // empty')
+  # Without this check a failed API call yields the string "null", which then
+  # becomes the import id "zones/<zone>/null" and fails confusingly two steps
+  # later. Fail here, where the cause is obvious.
+  [ -n "$existing_rs" ] && [ "$existing_rs" != "null" ] || {
+    red "ruleset creation FAILED - the API returned no id."
+    red "Most likely the token lacks Zone WAF edit on this zone."
+    exit 1
+  }
   green "created ruleset: $existing_rs"
 fi
 echo "$existing_rs" > "$REPO_ROOT/brownfield/ruleset.id"

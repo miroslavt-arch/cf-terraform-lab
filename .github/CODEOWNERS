@@ -1,7 +1,16 @@
-# Topic 10 — per-fragment ownership. Each WAF fragment routes to a different
-# (simulated) team; in a real org these would be @org/team-incident etc.
-# On this lab repo every "team" resolves to the instructor account so the
-# review-request mechanics are visible end to end.
+# Topic 10 - per-fragment ownership.
+#
+# HONEST NOTE FOR THE DEMO: in a real org each line below would name a
+# DIFFERENT team (@org/team-incident, @org/team-security, @org/team-app). On
+# this single-account lab every handle necessarily resolves to the instructor,
+# because GitHub requires a code owner to have write access to the repo and
+# there is only one such account. The MECHANISM is real and reviewable - the
+# routing, the required-review behaviour, and the per-path granularity are all
+# exactly what you would ship - but do not claim on stage that three separate
+# teams are being notified here. Say: "in your org these are three teams; here
+# they all point at me, because I am the only member of this repo."
+#
+# The team each path WOULD belong to is named in the comment beside it.
 
 # incident-response team owns the kill-switches
 /infra/modules/waf-composed/rules/incident.yaml   @miroslavt-arch

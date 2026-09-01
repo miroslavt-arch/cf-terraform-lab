@@ -19,7 +19,7 @@ again and again: every shared thing needs exactly one owner.
 (each with its own README + roots) · `scripts/demo-32-{phase,dual,list,noise}.sh`
 
 ## 1. Phase ownership — `demo-32-phase.sh`
-Two roots claim `http_request_late_transform`. A applies and owns it; B's
+Two roots claim `http_request_firewall_managed`. A applies and owns it; B's
 apply **fails** (`already exists`) — and the README walks the ping-pong that
 starts when B's team "fixes" it by deleting A's ruleset.
 *Real output (2026-08-14):* A applies green; B fails on the API call — the
