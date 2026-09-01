@@ -5,6 +5,11 @@
 source "$(dirname "$0")/lib/common.sh"
 cd "$REPO_ROOT"
 
+# Ensure the provider mapping exists. Without init, mock_provider "cloudflare"
+# resolves to hashicorp/cloudflare and every run fails with "Provider type
+# mismatch" - which is what happens on a fresh CI runner.
+[ -d .terraform ] || terraform init -backend=false -input=false >/dev/null
+
 say "Topic 7: a module interface is a CONTRACT — bad input dies at plan, in the caller's terminal, with a message we wrote"
 
 note "1/2 — feeding zone-baseline a record key WITHOUT the lab- prefix (violates the safety contract)..."
