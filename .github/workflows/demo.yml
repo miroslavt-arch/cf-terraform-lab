@@ -17,6 +17,13 @@ on:
         type: choice
         default: topic-27-drift-detection
         options:
+          - topic-07-module-design
+          - topic-09-singleton-ownership
+          - topic-10-waf-composition
+          - topic-11-kill-switch
+          - topic-14-tunnel-design-walkthrough
+          - topic-20-stale-plan-invariant
+          - topic-24-terraform-test
           - topic-27-drift-detection
           - topic-29-brownfield-adoption
           - topic-32-plan-noise
@@ -47,11 +54,24 @@ jobs:
           terraform_version: "1.15.8"
           terraform_wrapper: false
 
+      - name: install conftest (Topic 10 lints WAF fragments with it)
+        if: contains(inputs.topic, 'topic-10')
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.69.0/conftest_0.69.0_Linux_x86_64.tar.gz | tar xz conftest
+          sudo mv conftest /usr/local/bin/
+
       - name: run the demo
         id: run
         run: |
           set -o pipefail
           case "${{ inputs.topic }}" in
+            topic-07-module-design)      SCRIPT=scripts/demo-07-validation.sh ;;
+            topic-09-singleton-ownership) SCRIPT=scripts/demo-09-singleton-flap.sh ;;
+            topic-10-waf-composition)    SCRIPT=scripts/demo-10-fragment-lint.sh ;;
+            topic-11-kill-switch)        SCRIPT=scripts/ci-demo-11-killswitch.sh ;;
+            topic-14-tunnel-design-walkthrough) SCRIPT=scripts/ci-demo-14-walkthrough.sh ;;
+            topic-20-stale-plan-invariant) SCRIPT=scripts/ci-demo-20-stale-plan.sh ;;
+            topic-24-terraform-test)     SCRIPT=scripts/demo-24-unit-tests.sh ;;
             topic-27-drift-detection)    SCRIPT=scripts/ci-demo-27-drift.sh ;;
             topic-29-brownfield-adoption)
               bash brownfield/seed-legacy.sh 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee -a /tmp/out.txt

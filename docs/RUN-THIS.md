@@ -64,6 +64,33 @@ Then enlarge the font: Ctrl and `+`, four or five times.
 | **2** | https://github.com/miroslavt-arch/cf-terraform-lab/actions/workflows/demo.yml |
 | **3** | https://dash.cloudflare.com/f40b69d8637a12568c6a62d218822384/zesty-beta.sxplab.com/dns/records |
 
+## THE FULL TOPIC MENU (Actions → demo → Run workflow)
+
+All twelve entries run from the GitHub console. The three this session covers
+are marked ★; the rest are there so you can take any question anywhere.
+
+| Menu entry | What it shows | Live? |
+|---|---|---|
+| `topic-07-module-design` | validation fires at plan time with the module's own message | offline |
+| `topic-09-singleton-ownership` | two roots flap one zone setting, both green | live |
+| `topic-10-waf-composition` | per-team fragment lint blocks a `skip` action | offline |
+| `topic-11-kill-switch` | arms + disarms the live incident rules, timed | live |
+| `topic-14-tunnel-design-walkthrough` | design walkthrough — verified against module source | code only |
+| `topic-20-stale-plan-invariant` | `Saved plan is stale` refusal | live |
+| `topic-24-terraform-test` | 5 mocked tests, no credentials | offline |
+| ★ `topic-27-drift-detection` | exit code 2, resource named, healed | live |
+| ★ `topic-29-brownfield-adoption` | 5 imported, 0 changed, gate reaches No changes | live |
+| ★ `topic-32-plan-noise` | the never-settling plan | live |
+| ★ `topic-32-dual-writers` | two roots, one record, forever-flap | live |
+| ★ `topic-32-phase-ownership` | API refuses the second claimant | live |
+
+Topic 14 cannot run: the lab token can read tunnels but not create them, and
+the HA demo needs two local containers. Its job prints the design and the real
+module code rather than faking a run — say that out loud if it comes up.
+
+Topic 20's *full* human-gate demo is the `tf-pr` / `tf-apply` pipeline itself
+(open a PR, watch the gate). The menu entry covers the invariant underneath it.
+
 ## TWO WAYS TO RUN EVERY TOPIC
 
 Each topic can be driven either way. Pick one and stay consistent — mixing
