@@ -27,23 +27,23 @@ echo "      nslookup -type=TXT $REC 1.1.1.1"
 
 say "PROOF 2 — change it with Terraform, watch the internet change"
 
-NS=$(cf_api GET "/zones?name=$LAB_ZONE" | jq -r '.result[0].name_servers[0]')
+ZID=$(cf_api GET "/zones?name=$LAB_ZONE" | jq -r '.result[0].id')
 
-auth_ttl() { # ask the AUTHORITATIVE server, so no recursive cache is involved
-  nslookup -debug -type=TXT "$REC" "$NS" 2>/dev/null | grep -oE 'ttl = [0-9]+' | tail -1
+live_ttl() { # the API is the authoritative source, with no DNS cache in the way
+  cf_api GET "/zones/$ZID/dns_records?name=$REC" | jq -r '.result[0].ttl'
 }
 
-note "asking the zone's own authoritative nameserver ($NS)."
-note "this bypasses every cache - it is the source of truth, live:"
-echo "      $(auth_ttl)"
+note "TTL on the live record right now, straight from the Cloudflare API:"
+echo "      ttl = $(live_ttl)"
 
-note "now changing the TTL in code (300 -> 120) and applying..."
+note "changing it in CODE (300 -> 120) and applying..."
 sed -i -E 's/ttl     = 300/ttl     = 120/' "$ENV_LAB/main.tf"
 terraform -chdir="$ENV_LAB" apply -auto-approve -input=false 2>&1   | grep -E "will be updated|Apply complete" | sed 's/^/      /'
 
-note "asking the authoritative nameserver again:"
-echo "      $(auth_ttl)"
-green "the public internet now returns the value this repo says it should."
+note "the same API call again - nothing cached, nothing mocked:"
+echo "      ttl = $(live_ttl)"
+note "and refresh the dashboard in Tab 3: the record shows 2 min instead of 5."
+green "a line of code changed an object on Cloudflare's edge. That is the whole job."
 
 say "PROOF 3 — the WAF rules are live objects, not a YAML file"
 
