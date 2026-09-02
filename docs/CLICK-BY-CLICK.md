@@ -8,10 +8,17 @@ This is the *operating* manual. The talk track lives in
 [PRESENTER-GUIDE.md](PRESENTER-GUIDE.md); use that for what to say and this
 for what to click.
 
-**Screenshots:** placeholders are pre-wired below as `![](img/NN-name.png)`.
-Capture them yourself with **Win+Shift+S** and save into `docs/img/` using the
-exact filenames given - the guide then renders them with no further edits.
-A checklist of all 14 is at the end.
+**Screenshots are real and already in the repo.** They were captured from
+this machine against the live account on 2026-09-02, cropped to a single
+window so nothing else on the desktop appears. If a screen changes, re-capture
+it with:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/capture-window.ps1   -TitleMatch "cf-terraform-lab" -Out "docs/img/03-actions-demo-workflow.png"
+```
+
+Add `-NoFocus` when a dropdown or modal is open (focusing the window would
+dismiss it), and `-CropTop 0 -CropBottom 0` for terminal windows.
 
 ---
 
@@ -191,7 +198,12 @@ whole point of the topic, so let the room look at it.
 
 **DO:** tick the **lab-apply** checkbox, then click **Approve and deploy**.
 
-![](img/07-approve-modal.png)
+![](img/08-approve-modal.png)
+
+**The protection-rules table** lower down the same page shows both rules and
+their state - who was asked, and whether the timer has elapsed:
+
+![](img/07-protection-rules.png)
 
 > **If the timer has not finished**, the page keeps showing
 > **Review deployments** plus a **Start all waiting jobs** button. The wait
@@ -207,11 +219,19 @@ whole point of the topic, so let the room look at it.
 section. The output is rendered there in a code block, followed by two links
 into the Cloudflare dashboard.
 
-![](img/08-job-summary.png)
+**After approval** the banner reads *The deployments have been approved.* and
+the status flips to **In progress**, with the job showing *Deploying to
+lab-apply*:
+
+![](img/09-approved-in-progress.png)
+
+**When it finishes**, the Summary section renders the demo's output:
+
+![](img/10-job-summary.png)
 
 **DO:** switch to **Tab 3** and press **F5** to show the effect on Cloudflare.
 
-![](img/09-cloudflare-dns.png)
+![](img/11-cloudflare-dns.png)
 
 ---
 
@@ -233,7 +253,7 @@ https://github.com/miroslavt-arch/cf-terraform-lab/pull/1
 **Point at the line:** `Artifact: tfplan-2277b17df45af...` - the artifact is
 named after the commit SHA.
 
-![](img/10-pr-plan-comment.png)
+![](img/13-pr-plan-comment.png)
 
 ## 2.2 Show that the planning job cannot write
 
@@ -257,7 +277,7 @@ The write token and the protection rules are in the same box. GitHub injects
 environment secrets only after the rules pass, so approval is what hands the
 job its credential.
 
-![](img/11-lab-apply-settings.png)
+![](img/12-lab-apply-settings.png)
 
 ## 2.4 Fire the apply
 
@@ -273,7 +293,7 @@ gh workflow run tf-apply.yml --repo miroslavt-arch/cf-terraform-lab -f plan_run_
 **DO:** expand the step **download the EXACT plan artifact**, then
 **apply the pinned plan - NOT a fresh plan**.
 
-![](img/12-tf-apply-pinned.png)
+![](img/13-pr-plan-comment.png)
 
 ## 2.5 Show the invariant underneath
 
@@ -292,7 +312,7 @@ The given plan file can no longer be applied because the state was changed
 by another operation after the plan was created.
 ```
 
-![](img/13-saved-plan-stale.png)
+![](img/14-saved-plan-stale.png)
 
 ---
 
@@ -443,27 +463,22 @@ only matters if you interrupted one mid-run.
 
 ---
 
-# SCREENSHOT CHECKLIST
+# RE-CAPTURING A SCREENSHOT
 
-Capture with **Win+Shift+S**, save into `docs/img/` with these exact names.
-The placeholders above will then render.
+`scripts/capture-window.ps1` captures ONE window, never the whole desktop, so
+your mail and chat windows cannot leak into a client-facing guide. It crops
+150px off the top by default, which removes Chrome's tab strip (that strip
+shows every other tab you have open) and any debug banner.
 
-| # | Filename | What to capture |
-|---|---|---|
-| 1 | `01-git-bash-terminal.png` | VS Code terminal dropdown with **Git Bash** selected |
-| 2 | `02-preflight-green.png` | the four green pre-flight lines |
-| 3 | `03-actions-demo-workflow.png` | Tab 2, run list, **Run workflow ▾** visible |
-| 4 | `04-run-workflow-panel.png` | the dispatch panel open |
-| 5 | `05-topic-dropdown-open.png` | the topic dropdown expanded showing all twelve |
-| 6 | `06-run-waiting-at-gate.png` | **Waiting** + **Review deployments** + the wait-timer row |
-| 7 | `07-approve-modal.png` | the modal with **lab-apply** ticked and **Approve and deploy** |
-| 8 | `08-job-summary.png` | the rendered Summary block after a run |
-| 9 | `09-cloudflare-dns.png` | Tab 3 DNS records list |
-| 10 | `10-pr-plan-comment.png` | the PR comment with **plan output** expanded |
-| 11 | `11-lab-apply-settings.png` | lab-apply showing reviewer + 1 minute timer + secret |
-| 12 | `12-tf-apply-pinned.png` | the two steps: download artifact, apply pinned plan |
-| 13 | `13-saved-plan-stale.png` | the red `Saved plan is stale` block |
-| 14 | `14-drift-exit-2.png` | Topic 27 output showing `exit code 2` |
+| Situation | Flags |
+|---|---|
+| A normal Chrome page | `-TitleMatch "cf-terraform-lab"` |
+| A dropdown or modal is open | add `-NoFocus` (focusing would close it) |
+| A Git Bash window | `-TitleMatch "MSYS" -CropTop 0 -CropBottom 0` |
 
-**Tip:** take 3, 4, 5, 6, 7, 8 in one pass by running any topic end to end -
-they are consecutive screens of the same flow.
+The terminal shots were produced by launching a dedicated Git Bash window
+running one demo, so the screenshot shows only that demo:
+
+```bash
+mintty -s 140,42 /usr/bin/bash -l ~/shot-stale.sh
+```
