@@ -1,8 +1,8 @@
 # CHEAT CARD — keep this open on your second screen
 
-One line per topic, in delivery order. The full narration is in
-[PRESENTER-GUIDE.md](PRESENTER-GUIDE.md); this page is for when you are live and
-need the command, the thing to point at, and the sentence that lands.
+One line per topic, in delivery order. The structured version — every topic as
+**explain / run / review**, plus the six workflows and how each is triggered — is
+[RUN-OF-SHOW.md](RUN-OF-SHOW.md). This page is the glanceable one.
 
 **Every command on this page is Git Bash.** In PowerShell they fail with
 `The term 'source' is not recognized` — that is the shell, not the lab.
