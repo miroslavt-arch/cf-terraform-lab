@@ -49,9 +49,12 @@ if cfout=$(env -u CLOUDFLARE_ACCOUNT_ID cf-terraforming generate              --
   green "cf-terraforming emitted HCL for the live records above. That is DISCOVERY;"
   green "the adoption below uses import blocks, which is the bulk path."
 else
-  red "cf-terraforming generate FAILED - discovery unavailable on this account:"
+  red "cf-terraforming generate FAILED. This is the TOOL, not the account:"
   sed 's/^/    /' /tmp/cft-err.txt | head -3
-  note "Continuing: the import blocks below do not depend on it."
+  note "Known: cf-terraforming v0.28 panics against cloudflare provider 5.24 on"
+  note "the Linux runner. It works locally, where this same command emits HCL for"
+  note "every live record. Discovery is a convenience anyway - the adoption below"
+  note "uses import blocks and does not depend on it."
 fi
 
 
