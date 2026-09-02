@@ -21,6 +21,12 @@ rm -f "$adopt"/terraform.tfstate "$adopt"/terraform.tfstate.backup       "$adopt
 
 say "Topic 29: resources Terraform has NEVER seen -> a clean no-op plan, without touching the live estate"
 
+# init FIRST: cf-terraforming reads the provider schema from this working
+# directory, so without the plugins installed it fails with "Required plugins
+# are not installed". Locally that is masked by a leftover .terraform dir;
+# on a clean runner it is fatal.
+terraform init -input=false >/dev/null 2>&1 || terraform init -input=false
+
 note "0/4 - DISCOVERY: what does cf-terraforming see that Terraform does not?"
 # cf-terraforming is the discovery tool: point it at a live zone and it emits
 # HCL for what is actually there. Report honestly whether it worked - a silent
@@ -48,7 +54,6 @@ else
   note "Continuing: the import blocks below do not depend on it."
 fi
 
-terraform init -input=false >/dev/null 2>&1 || terraform init -input=false
 
 note "1/4 — planning the CSV-driven import blocks (5 records, ONE import block)..."
 terraform plan -input=false -no-color -var "zone_id=$zone_id" -var "zone_name=$LAB_ZONE" \
