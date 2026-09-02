@@ -8,6 +8,10 @@ repo https://github.com/miroslavt-arch/cf-terraform-lab
 - Blockquotes are narration. Say them in your own words, do not read them out.
 - **If asked** = the questions that actually come up.
 
+> **Presenting right now?** Use [CHEAT-CARD.md](CHEAT-CARD.md) instead - one
+> screen, one line per topic, in delivery order. This file is the full
+> narration to read *beforehand*.
+
 ---
 
 ## WHICH TERMINAL - read this first
