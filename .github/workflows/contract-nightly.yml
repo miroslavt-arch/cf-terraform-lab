@@ -37,5 +37,8 @@ jobs:
           terraform_version: "1.15.8"
       - name: run contract tests
         run: |
-          terraform init -backend=false -input=false
+          # -test-directory on INIT too: modules referenced from a non-default
+          # test directory are not installed by a plain init, which fails at
+          # run time with "Module not installed".
+          terraform init -backend=false -input=false -test-directory=tests/contract
           terraform test -test-directory=tests/contract

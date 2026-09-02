@@ -7,6 +7,19 @@
 #   terraform test -test-directory=tests/contract
 # Needs: CLOUDFLARE_API_TOKEN (write) + TF_VAR_contract_zone_id/_name.
 
+# Declared HERE, not just in the root variables.tf. A test file that
+# references var.X without declaring it makes Terraform parse the TF_VAR_ value
+# as an EXPRESSION rather than a string — so a zone name like
+# "zesty-beta.sxplab.com" fails with "Extra characters after expression".
+# Terraform warns that this is deprecated and will become an error.
+variable "contract_zone_id" {
+  type = string
+}
+
+variable "contract_zone_name" {
+  type = string
+}
+
 run "record_roundtrip" {
   command = apply
 
