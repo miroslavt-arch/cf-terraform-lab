@@ -6,6 +6,10 @@ the failure it prevents, and a pointer to the files you copy.
 Diagrams render on GitHub as-is. Nothing here is specific to Cloudflare except
 where noted — the shapes apply to any Terraform provider.
 
+> **Presenting these?** [docs/DIAGRAM-SCRIPT.md](../docs/DIAGRAM-SCRIPT.md) is a
+> read-aloud walkthrough of all thirteen diagrams, with pointing cues and
+> timings. Roughly 50 minutes, or 30 if you cut to the spine.
+
 **Contents**
 
 | # | Pattern | Prevents |
