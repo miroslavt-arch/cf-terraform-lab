@@ -8,6 +8,11 @@ so.
 **[ARCHITECTURE.md](ARCHITECTURE.md) — diagrams and how each pattern works.**
 Read that first; this file is the index.
 
+Two parts. **Part I** is infrastructure — ten patterns, built and run against a
+live account. **Part II** maps five of them onto AI systems (prompts, models,
+retrieval, agents), where the same shapes hold and the failure modes are
+sharper, because an LLM system can change behaviour with no diff at all.
+
 ---
 
 ## What's here
@@ -24,6 +29,7 @@ adoption-kit/
 ├─ policy/                      conftest / OPA
 │  ├─ destroy_guard.rego        refuse plans that destroy the wrong thing
 │  ├─ fragment_policy.rego      what each team may contribute to a shared object
+│  ├─ eval_release_guard.rego   AI: release thresholds as code
 │  └─ fixtures/                 known-good and known-bad, for the meta-test
 ├─ examples/                    Terraform patterns, copy the shape
 │  ├─ variables-with-validation.tf   the module contract
@@ -34,7 +40,10 @@ adoption-kit/
 │  ├─ import-blocks.tf               brownfield adoption
 │  ├─ import-and-compare.tf          drift detection without remote state
 │  ├─ tunnel-ha.tf                   two connectors, one tunnel
-│  └─ docker-compose.tunnel.yml      the HA demo
+│  ├─ docker-compose.tunnel.yml      the HA demo
+│  ├─ evalset.yaml                   AI: a frozen eval set
+│  ├─ eval-tier-one.py               AI: offline evals, no model call
+│  └─ prompt-inventory.md            AI: brownfield adoption worksheet
 ├─ modules/README.md            what makes a module a contract
 └─ scripts/
    ├─ drift_report.py           render drift + attribute it to a human
@@ -142,6 +151,11 @@ Honest labelling, because a kit that overstates itself is worse than no kit.
 - **The audit-log join in `drift_report.py`.** Detection works; the attribution
   API returned 403 for us. The script degrades gracefully and says so rather
   than pretending — keep that behaviour when you adapt it.
+- **All of Part II (the AI patterns).** There was no AI system in the lab to
+  run them against. The policies are tested against fixtures in both
+  directions, and the workflows are syntactically valid — but no eval has
+  actually run through them. Every threshold in `eval_release_guard.rego` is a
+  starting point to calibrate against your own noise floor, not a measurement.
 
 ---
 

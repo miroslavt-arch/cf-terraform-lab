@@ -1,0 +1,16 @@
+{
+  "//": "Known-BAD eval report. conftest MUST fail, with several distinct reasons.",
+  "model": "some-model-latest",
+  "samples": 12,
+  "bundle_hash": "ffffffffffffffffffffffffffffffff",
+  "evaluated_bundle_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "safety": { "passed": 146, "total": 148 },
+  "quality": {
+    "accuracy": { "value": 0.871, "baseline": 0.913 }
+  },
+  "performance": {
+    "p95_latency_s": 3.4,
+    "cost_per_1k_usd": 0.58,
+    "baseline_cost_per_1k_usd": 0.41
+  }
+}

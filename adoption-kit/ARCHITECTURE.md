@@ -25,6 +25,16 @@ where noted — the shapes apply to any Terraform provider.
 | 9 | [Tunnel HA](#9-tunnel-ha-and-rotation) | a single connector as a single point of failure |
 | 10 | [The sharp edges](#10-the-sharp-edges) | four specific ways this bites |
 
+**[Part II — the same patterns for AI systems](#part-ii--the-same-patterns-for-ai-systems)**
+
+| # | Pattern | Prevents |
+|---|---|---|
+| AI-1 | [The gated eval pipeline](#ai-1-the-gated-eval-pipeline) | shipping a prompt nobody measured |
+| AI-2 | [Two-tier evaluation](#ai-2-two-tier-evaluation) | evals too slow to run, or too flaky to trust |
+| AI-3 | [Model drift detection](#ai-3-model-drift-detection) | quality falling with zero code changes |
+| AI-4 | [Brownfield prompt adoption](#ai-4-brownfield-prompt-adoption) | refactoring prompts nobody measured |
+| AI-5 | [The sharp edges, AI edition](#ai-5-the-sharp-edges-ai-edition) | injection, contamination, silent deprecation |
+
 ---
 
 ## The whole system, one picture
@@ -682,3 +692,524 @@ flowchart LR
 5. **Module contracts.** Refactor toward these as modules stabilise.
 6. The rest as the problems actually show up. Adopting a pattern for a problem
    you do not have is how platform teams lose credibility.
+
+---
+---
+
+# Part II — the same patterns for AI systems
+
+Everything above is about infrastructure. This part maps the same five
+load-bearing patterns onto LLM systems: prompts, models, retrieval, tools,
+agents.
+
+The mapping is not a metaphor. A prompt is configuration. A model version is a
+pinned dependency. An eval suite is a test suite. And an LLM system has one
+property infrastructure does not — **it can change behaviour with no diff at
+all**, because the model underneath you moved. That makes drift detection more
+important here, not less.
+
+| Infra pattern | AI equivalent | The thing that bites |
+|---|---|---|
+| [gated pipeline](#ai-1-the-gated-eval-pipeline) | approve an **eval report**, ship that exact bundle | shipping a prompt nobody measured |
+| [two-tier testing](#ai-2-two-tier-evaluation) | offline assertions vs live-model evals | evals too slow and costly to run, or too fake to help |
+| [drift detection](#ai-3-model-drift-detection) | re-run a frozen eval set against a pinned model | quality falling with zero code changes |
+| [brownfield adoption](#ai-4-brownfield-prompt-adoption) | inventory scattered prompts, freeze a baseline | refactoring prompts nobody measured |
+| [sharp edges](#ai-5-the-sharp-edges-ai-edition) | five specific AI failures | non-determinism, injection, silent deprecation |
+
+> **Status: design guidance, not verified.** Part I was built and run against a
+> live account. This part was not — there was no AI system in the lab to run it
+> against. The shapes come from the same reasoning and from well-documented
+> failure modes, but treat every threshold and number here as a starting point
+> to calibrate, not a measurement. It is labelled this way on purpose; see the
+> verified/not-verified section in [README.md](README.md).
+
+---
+
+## The AI system, one picture
+
+```mermaid
+flowchart TB
+    subgraph dev["On the laptop — seconds, free"]
+        A["edit prompt / tool schema"] --> B["template renders?<br/>schema valid?<br/>tokens under budget?"]
+        B --> C["pre-commit<br/>secrets · lint · no PII in fixtures"]
+    end
+
+    subgraph pr["On the pull request — minutes, costs money"]
+        C --> D["tier-one evals<br/>mocked model · deterministic"]
+        D --> E["tier-two evals<br/>REAL model · frozen eval set"]
+        E --> F["score vs baseline<br/>+ safety suite"]
+        F --> G["release policy<br/>thresholds as code"]
+        G --> H["eval report artifact<br/>keyed by commit SHA"]
+    end
+
+    subgraph gate["The gate — a human reads the REPORT"]
+        H --> I["dispatch release"]
+        I --> J{{"required reviewer<br/>+ wait timer"}}
+        J -->|approved| K["ship THAT bundle<br/>prompt + model pin + tools"]
+    end
+
+    subgraph clock["On a schedule — unattended"]
+        L["model drift<br/>nightly, frozen set"]
+        M["deprecation watch<br/>weekly"]
+        N["prod sampling<br/>continuous"]
+    end
+
+    K --> P[("live AI system")]
+    P -.->|"observed by"| L
+    P -.->|"observed by"| N
+    L -.->|"score drop"| Q["someone looks"]
+    M -.->|"model sunsetting"| Q
+    N -.->|"regression in the wild"| Q
+```
+
+**What changes versus Part I.** Two things, and both are load-bearing.
+
+**The plan becomes an eval report.** In Terraform the artifact is a plan: a
+precise list of what will change. In an AI system there is no such list —
+behaviour is statistical. So the artifact is a *measurement*: scores on a frozen
+eval set, with confidence intervals, against a named baseline.
+
+**The dependency can move without you.** A Terraform provider version stays put
+until you bump it. A model endpoint can be updated underneath you. That is the
+difference between an alias and a dated snapshot, and it is why the nightly
+drift job matters more here than it does for infrastructure.
+
+---
+
+## AI-1. The gated eval pipeline
+
+**Files:** [`workflows/ai-eval-pr.yml`](workflows/ai-eval-pr.yml) ·
+[`workflows/ai-release.yml`](workflows/ai-release.yml) ·
+[`policy/eval_release_guard.rego`](policy/eval_release_guard.rego)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as engineer
+    participant PR as ai-eval-pr
+    participant M as model API
+    participant Art as artifact store
+    participant Rev as reviewer
+    participant Rel as ai-release
+    participant Prod as production
+
+    Dev->>PR: change a prompt
+    Note over PR: budget-capped key.<br/>Cannot spend beyond a ceiling.
+    PR->>PR: tier one — mocked, deterministic
+    PR->>M: tier two — frozen eval set, n samples
+    M-->>PR: completions
+    PR->>PR: score vs baseline + safety suite
+    PR->>PR: release policy (thresholds as code)
+    PR->>Art: upload evalreport-<sha>
+    PR->>Dev: comment scores + deltas on the PR
+
+    Dev->>Rel: dispatch (report_run_id, sha)
+    Note over Rel: job STOPS here.<br/>No production key yet.
+    Rel->>Rev: waiting for review
+    Rev-->>Rel: approve THE REPORT, not the diff
+    Note over Rel: production credential injected NOW
+    Rel->>Art: download evalreport-<sha>
+    Rel->>Rel: verify bundle hash matches the report
+    Rel->>Prod: ship prompt + model pin + tool defs
+```
+
+### The mechanism
+
+Same two ideas as Part I, adapted.
+
+**The credential is unreachable, and it is also a budget.** An AI pipeline has a
+failure mode infrastructure does not: a runaway loop that spends real money. So
+the PR environment holds a key with a hard spending cap, and the production key
+lives behind the gate. Two different risks, two different credentials.
+
+**The bundle is pinned, and it is bigger than a prompt.** What ships is not "the
+prompt". It is:
+
+```
+prompt template + model snapshot id + decoding params + tool definitions
++ retrieval config + system instructions
+```
+
+Change any one of those and the behaviour changes. So the release artifact is a
+**hash of the whole bundle**, and the release job verifies that the hash it is
+about to ship matches the hash that was evaluated. If someone edits the prompt
+between the eval and the release, the hashes diverge and the job refuses.
+
+That is this pattern's version of `Error: Saved plan is stale`.
+
+### What the reviewer actually approves
+
+This is worth being explicit about. In Terraform the reviewer reads a diff and a
+plan. Here, **the diff is nearly useless** — a three-word prompt change can move
+a score ten points, and a rewritten paragraph can move nothing at all.
+
+So the PR comment leads with the measurement, not the diff:
+
+```
+evalreport-a1b2c3d  ·  model: <pinned-snapshot-id>  ·  n=200
+
+  accuracy      0.913  →  0.927   +1.4pp   ok
+  refusal rate  0.021  →  0.019   -0.2pp   ok
+  p95 latency   1.84s  →  2.31s   +0.47s   OVER BUDGET
+  cost / 1k     $0.41  →  $0.58   +41%     OVER BUDGET
+
+  safety suite  148/148 pass
+  BLOCKED by release policy: latency and cost regressions
+```
+
+> **Reviewers approve a measurement, not an intention.** If your PR comment
+> shows a diff and not a score, you have built code review, not an eval gate.
+
+### What it prevents
+
+Shipping a prompt change because it "reads better". Also: shipping a bundle that
+differs from the one that was measured — easier to do than it sounds once
+prompts live in several files.
+
+### Adopting it
+
+1. Freeze an eval set **before** you change anything. Without a baseline there
+   is nothing to gate on.
+2. Two credentials: budget-capped for PRs, production behind the gate.
+3. Thresholds in [`policy/eval_release_guard.rego`](policy/eval_release_guard.rego),
+   not in a runbook. Start with the ones you can defend and add more as you
+   learn what actually regresses.
+
+---
+
+## AI-2. Two-tier evaluation
+
+**Files:** [`workflows/ai-eval-pr.yml`](workflows/ai-eval-pr.yml) ·
+[`examples/eval-tier-one.py`](examples/eval-tier-one.py) ·
+[`examples/evalset.yaml`](examples/evalset.yaml)
+
+```mermaid
+flowchart LR
+    subgraph t1["TIER ONE — every push · free · deterministic"]
+        direction TB
+        A1["mocked model client"] --> A2["template renders<br/>with every fixture"]
+        A2 --> A3["tool schemas valid<br/>JSON Schema check"]
+        A3 --> A4["output parser survives<br/>golden + malformed input"]
+        A4 --> A5["token budget<br/>context fits"]
+        A5 --> A6["seconds · no cost"]
+    end
+
+    subgraph t2["TIER TWO — gated · real model · statistical"]
+        direction TB
+        B1["frozen eval set"] --> B2["n samples per case<br/>not 1"]
+        B2 --> B3["score with CONFIDENCE<br/>intervals, not equality"]
+        B3 --> B4["safety suite<br/>must be 100%"]
+        B4 --> B5["minutes · real money"]
+    end
+
+    t1 -->|"passes"| t2
+
+    style A6 fill:#efe,stroke:#0a0
+    style B5 fill:#ffd,stroke:#c80
+```
+
+### The mechanism
+
+The split is the same as Part I and for the same reason: an eval suite that
+costs twenty dollars and eight minutes will not run on every push, and one that
+does not run on every push does not protect you.
+
+**Tier one never calls a model.** It is not a weaker version of tier two — it
+catches an entirely different and surprisingly large class of bug:
+
+- a template that crashes when a variable is empty or contains a brace
+- a tool definition that is not valid JSON Schema, so the model never calls it
+- an output parser that dies on the model's second-most-common format
+- a prompt that silently exceeds the context window once retrieval is included
+
+None of those need a model to find, and all of them are outages.
+
+**Tier two is statistical, and this is where teams get it wrong.** An LLM eval
+is not a unit test. Three rules:
+
+**Sample more than once.** Even at temperature 0, output is not guaranteed
+identical across calls. Run each case *n* times — n=5 for a quick signal, n=20+
+when you need a tight interval.
+
+**Assert on intervals, not equality.** `accuracy == 0.93` is a flaky test.
+`accuracy >= baseline - 2pp` at a stated confidence level is a check. If your
+eval fails randomly one run in five, people will rerun it until it goes green,
+and you have lost the signal entirely.
+
+**Separate the safety suite.** Quality metrics get a tolerance band. Safety
+cases do not — those are pass/fail at 100%, and a regression there blocks
+regardless of how good the quality numbers look.
+
+### On LLM-as-judge
+
+Useful, and a dependency like any other. Two rules if you use one: **pin the
+judge model separately** from the model under test, and **hold out a
+human-labelled subset** to check the judge itself has not drifted. A judge whose
+behaviour moved will report clean scores while quality falls — which is the
+worst possible failure, because it is silent and it is in your instrumentation.
+
+### What it prevents
+
+Evals too slow and expensive to run, and evals so flaky people learn to rerun
+them until green.
+
+---
+
+## AI-3. Model drift detection
+
+**Files:** [`workflows/ai-drift.yml`](workflows/ai-drift.yml)
+
+```mermaid
+flowchart TB
+    Cron(["cron — nightly"]) --> F["frozen eval set<br/>+ PINNED model snapshot"]
+    F --> R["re-run · same n · same params"]
+    R --> C{"delta vs<br/>recorded baseline"}
+    C -->|"within band"| Ok["no drift — silent"]
+    C -->|"beyond band"| D["QUALITY MOVED<br/>with zero code changes"]
+    C -->|"error / 404"| X["model UNAVAILABLE<br/>deprecated or retired"]
+
+    D --> W["which cases regressed?<br/>diff the per-case scores"]
+    W --> Fail["FAIL — someone looks"]
+    X --> Fail
+
+    subgraph causes["what actually changed"]
+        direction TB
+        Y1["provider updated the model"]
+        Y2["retrieval corpus changed"]
+        Y3["a tool's API changed"]
+        Y4["input distribution shifted"]
+    end
+    D -.-> causes
+
+    style D fill:#ffd,stroke:#c80
+    style X fill:#fee,stroke:#c00
+    style Ok fill:#efe,stroke:#0a0
+    style Fail fill:#fee,stroke:#c00
+```
+
+### The mechanism
+
+This is the pattern that matters most in the AI half, because of a property
+infrastructure does not have: **your system can get worse while nobody touches
+it.**
+
+Four ways that happens, none of which produce a commit:
+
+1. **The provider updated the model.** An undated alias points at whatever is
+   current. Pin the dated snapshot and you control when you move.
+2. **Your retrieval corpus changed.** Same prompt, same model, different
+   documents retrieved, different answer.
+3. **A tool the agent calls changed** its response shape or its latency.
+4. **Your input distribution shifted.** The model did not change; what users
+   send it did.
+
+So: freeze an eval set, pin the model, re-run nightly, compare to a recorded
+baseline. Anything beyond the band is drift.
+
+**Pin the model AND watch for deprecation.** These are different checks. A
+pinned snapshot protects you from silent updates — and then gets retired on a
+published schedule. A weekly job that calls each pinned model once and fails on
+a 404 or a deprecation header turns "the model disappeared on Tuesday" into
+weeks of warning.
+
+### Reading the result honestly
+
+A nightly eval has run-to-run variance, so the threshold has to sit outside the
+noise or you will get paged for nothing. **Establish the noise floor first:**
+run the same eval against the same pin, unchanged, for a week, and see how much
+it moves on its own. Set the band above that.
+
+A drift job that cries wolf is ignored within two weeks — the same failure mode
+as Part I, arriving faster because here the noise is real rather than imagined.
+
+And when it fires, **diff the per-case scores, not just the aggregate.** An
+aggregate that fell two points because one category collapsed is a completely
+different problem from one that fell two points evenly across the board.
+
+### What it prevents
+
+Quality degrading silently, and finding out from a customer rather than from a
+job.
+
+---
+
+## AI-4. Brownfield prompt adoption
+
+**Files:** [`examples/prompt-inventory.md`](examples/prompt-inventory.md)
+
+```mermaid
+flowchart TB
+    A[("prompts scattered<br/>in application code")] --> B["inventory<br/>grep, then read"]
+    B --> C["rank by blast radius<br/>traffic × consequence"]
+    C --> D["extract to versioned files<br/>code references by id"]
+    D --> E["capture CURRENT behaviour<br/>as the golden baseline"]
+    E --> F{"eval reproduces<br/>production today?"}
+    F -->|"no"| G["your HARNESS is wrong,<br/>not the prompt"]
+    G --> E
+    F -->|"yes"| H["baseline frozen<br/>NOW you may improve"]
+
+    style G fill:#fee,stroke:#c00
+    style H fill:#efe,stroke:#0a0
+    style F fill:#ffd,stroke:#c80
+```
+
+### The mechanism
+
+The inherited AI system looks like this: prompts as f-strings in application
+code, a few in a config file, one in a Slack message somebody pasted. No
+versioning. No evals. Nobody knows which ones carry traffic.
+
+The instinct is to start improving them. That is the mistake, and it is exactly
+the same mistake as refactoring an unadopted Terraform estate.
+
+**Inventory first, and rank by blast radius.** Traffic times consequence. The
+prompt behind a support-ticket classifier that runs ten thousand times a day
+outranks the one that formats an internal digest, however ugly the second one is.
+
+**Extract, do not improve.** Move each prompt to a versioned file with an id;
+application code references the id. Change *nothing* about the text yet. This
+step should be behaviour-neutral, and reviewable as such.
+
+**Then the step everyone skips: capture current behaviour as the baseline.**
+Sample real production inputs, record what the current system does, and make
+that your golden set — **including the outputs you think are wrong.**
+
+> You are not capturing what the system *should* do. You are capturing what it
+> *does*, so that when you change it you can prove what moved.
+
+**The gate:** your eval harness, running the extracted prompt, must reproduce
+production behaviour on that sample. If it does not, your harness is wrong —
+wrong temperature, missing system message, different retrieval config — and
+improving the prompt on top of a harness that does not reproduce production
+means you cannot attribute any change to anything.
+
+This is the exact analogue of `plan == No changes` before you refactor.
+
+### What it prevents
+
+Improving prompts nobody measured, and being unable to prove afterwards whether
+you helped or hurt.
+
+---
+
+## AI-5. The sharp edges, AI edition
+
+```mermaid
+flowchart TB
+    subgraph s1["NON-DETERMINISM AS FLAKINESS"]
+        A1["assert output == expected"] --> A2["fails 1 run in 5"]
+        A2 --> A3["team reruns until green"]
+        A3 --> A4["signal is gone"]
+    end
+    subgraph s2["PROMPT INJECTION VIA RETRIEVAL"]
+        B1["retrieved doc contains<br/>instruction-shaped text"] --> B2["model treats DATA<br/>as INSTRUCTIONS"]
+        B2 --> B3["your own corpus<br/>is the attack surface"]
+    end
+    subgraph s3["EVAL SET CONTAMINATION"]
+        C1["tune against the eval set"] --> C2["scores climb"]
+        C2 --> C3["production flat"]
+        C3 --> C1
+    end
+    subgraph s4["SILENT DEPRECATION"]
+        D1["pinned to a dated snapshot"] --> D2["retired on schedule"]
+        D2 --> D3["404 in production<br/>on a Tuesday"]
+    end
+    subgraph s5["CONTEXT COST CURVE"]
+        E1["just add more context"] --> E2["cost and latency<br/>grow with input"]
+        E2 --> E3["accuracy often falls<br/>past a point"]
+    end
+```
+
+### 1 · Non-determinism treated as flakiness
+
+The Part I analogue is plan noise: a diff that never converges, so people stop
+reading diffs. Here it is an eval that fails randomly, so people stop reading
+evals.
+
+**Fix:** sample n times, assert on intervals, and set thresholds outside the
+measured noise floor. Measure the floor — do not guess it.
+
+**Do not** fix it by pinning temperature to 0 and asserting equality. That is
+this pattern's `ignore_changes`: it looks deterministic, it is not quite, and
+you have hidden real variance instead of accounting for it.
+
+### 2 · Prompt injection via retrieved content
+
+The closest analogue to the dual-writer problem, and worse. In RAG and agent
+systems, retrieved documents and tool results enter the same context as your
+instructions. Content shaped like an instruction can be treated as one.
+
+The uncomfortable part: **your own corpus is the attack surface.** A support
+ticket, a wiki page, a scraped web result — anything a user can influence that
+later gets retrieved.
+
+**Mitigations, none of which is complete on its own:** mark retrieved content
+explicitly as untrusted data in the prompt structure; never let retrieved
+content decide which tool runs; require confirmation for consequential actions;
+and treat every tool result as untrusted input to the next step.
+
+Then test it — put injection strings in your eval set as **safety cases**, so a
+regression here blocks a release the same way any other safety failure does.
+
+### 3 · Eval set contamination
+
+You tune against your eval set. Scores climb. Production does not move.
+
+You have overfitted to two hundred examples. The Part I analogue is a lint that
+has quietly stopped linting: it still reports green and no longer measures
+anything.
+
+**Fix:** hold out a set you never tune against and look at only rarely. Refresh
+your eval set from production periodically. And when a score jumps a lot,
+suspect contamination before celebrating.
+
+### 4 · Silent deprecation
+
+Pinning a dated model snapshot is correct, and it has a cost: pinned snapshots
+get retired. The pin that protects you from silent updates is the same pin that
+404s on a sunset date you did not read.
+
+**Fix:** a weekly job that calls every pinned model once and fails on an error
+or a deprecation header. Cheap, and it converts a Tuesday outage into weeks of
+notice.
+
+### 5 · The context cost curve
+
+The scale analogue. "Just add more context" is the AI version of modelling five
+hundred list items as five hundred resources: it works, and then it does not.
+
+Cost and latency scale with input size, and accuracy frequently *falls* past a
+point as the relevant detail gets diluted. Measure your own curve — accuracy,
+p95 latency and cost against retrieved-chunk count — and pick the knee
+deliberately rather than defaulting to "more".
+
+---
+
+## Adopting the AI patterns — suggested order
+
+```mermaid
+flowchart LR
+    A["1 · freeze an eval set"] --> B["2 · pin every model"]
+    B --> C["3 · tier-one evals"]
+    C --> D["4 · nightly drift"]
+    D --> E["5 · the gated release"]
+    E --> F["6 · the rest"]
+```
+
+1. **Freeze an eval set.** Nothing else works without a baseline. It does not
+   need to be big or clever — fifty real cases beats five hundred synthetic ones.
+2. **Pin every model to a dated snapshot,** and add the deprecation watch the
+   same day. One-line change, highest ratio of protection to effort in this
+   section.
+3. **Tier-one evals.** Free, fast, and they catch template and schema breakage
+   that would otherwise reach production.
+4. **Nightly drift.** Now that a baseline exists, find out when it moves on its
+   own.
+5. **The gated release.** Do this once you trust your numbers. Gating on a
+   measurement you do not believe is theatre.
+6. The rest as the problems arrive.
+
+> The ordering differs from Part I on purpose. In infrastructure the first move
+> is the destroy guard, because the worst outcome is deleting something. In an
+> AI system the worst outcome is **not knowing whether you got better or
+> worse** — so the first move is a baseline.

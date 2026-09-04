@@ -1,0 +1,176 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EVAL ON PULL REQUEST — the AI equivalent of terraform-pr.yml.
+#
+# WHAT IT GIVES YOU
+#   Every prompt / model / tool change gets measured before a human sees it.
+#   Tier one runs free and deterministic. Tier two calls the real model against
+#   a FROZEN eval set. The result is an artifact keyed by commit SHA, and
+#   ai-release.yml ships exactly that bundle — nothing re-evaluated later.
+#
+# THE CREDENTIAL MODEL — two keys, two different risks
+#   `ai-eval` environment  : a BUDGET-CAPPED key. An AI pipeline can burn real
+#                            money in a loop; a cap is the equivalent of the
+#                            read-only token in the Terraform pipeline.
+#   `ai-prod` environment  : the production key, behind a required reviewer.
+#                            See ai-release.yml.
+#
+# BEFORE YOU USE THIS
+#   Freeze an eval set and record a baseline FIRST. Without a baseline there is
+#   nothing to gate on and this workflow is just an expensive linter.
+#
+# EVERY LINE YOU MUST CHANGE IS MARKED  # >>> CHANGE
+# ─────────────────────────────────────────────────────────────────────────────
+name: ai-eval-pr
+
+on:
+  pull_request:
+    branches: [main]
+    # Only spend money when something that changes BEHAVIOUR changed.
+    paths:                                  # >>> CHANGE to your layout
+      - "prompts/**"
+      - "tools/**"
+      - "eval/**"
+      - "config/models.yaml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-eval-${{ github.head_ref }}
+  cancel-in-progress: true                  # cancel superseded runs: they cost money
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # TIER ONE — no model, no credential, no cost. Runs in seconds.
+  # Catches a genuinely large class of outage: templates that crash on empty
+  # input, tool schemas the model can never call, parsers that die on the
+  # model's second-most-common output shape.
+  # ---------------------------------------------------------------------------
+  tier-one:
+    name: tier-one (mocked, deterministic, free)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install
+        run: pip install -r requirements-dev.txt   # >>> CHANGE
+
+      - name: templates render with every fixture
+        run: python -m pytest eval/tier_one -q    # >>> CHANGE
+
+      - name: tool definitions are valid JSON Schema
+        run: python eval/check_tool_schemas.py    # >>> CHANGE
+
+      - name: context fits the window
+        # A prompt that fits in dev and overflows once retrieval is included is
+        # a production 400, not a quality problem. Catch it here.
+        run: python eval/check_token_budget.py --max-input-tokens 100000  # >>> CHANGE
+
+  # ---------------------------------------------------------------------------
+  # TIER TWO — real model, frozen eval set, statistical.
+  # ---------------------------------------------------------------------------
+  tier-two:
+    name: tier-two (real model, frozen set)
+    needs: [tier-one]                       # never spend money on a broken template
+    runs-on: ubuntu-latest
+    environment: ai-eval                    # >>> CHANGE budget-capped key lives here
+    env:
+      # >>> CHANGE to your provider's variable.
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY_BUDGET_CAPPED }}
+      # Pin the model. An undated alias means your eval and your production
+      # can silently be measuring different things.
+      MODEL_ID: ${{ vars.MODEL_PIN }}       # >>> CHANGE e.g. a dated snapshot id
+      SAMPLES: "200"                        # >>> CHANGE see min_samples in the policy
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+
+      - name: hash the bundle BEFORE evaluating
+        id: bundle
+        # The bundle is everything that changes behaviour, not just the prompt.
+        # ai-release.yml re-hashes at ship time and refuses if it differs.
+        run: |
+          hash=$(cat prompts/**/*.md tools/*.json config/models.yaml \
+                 | sha256sum | cut -c1-32)          # >>> CHANGE paths
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "bundle hash: $hash"
+
+      - name: run the frozen eval set
+        run: |
+          python eval/run.py \
+            --evalset eval/evalset.yaml \
+            --model "$MODEL_ID" \
+            --samples "$SAMPLES" \
+            --baseline eval/baseline.json \
+            --bundle-hash "${{ steps.bundle.outputs.hash }}" \
+            --out evalreport.json
+
+      - name: safety suite
+        # Kept as a SEPARATE invocation on purpose. Quality metrics get a
+        # tolerance band; safety cases do not.
+        run: |
+          python eval/run.py \
+            --evalset eval/safety.yaml \
+            --model "$MODEL_ID" \
+            --samples "$SAMPLES" \
+            --merge-into evalreport.json \
+            --section safety
+
+      # -----------------------------------------------------------------------
+      # THE RELEASE GUARD. Thresholds live in policy, not in someone's head.
+      # -----------------------------------------------------------------------
+      - name: release policy
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.69.0/conftest_0.69.0_Linux_x86_64.tar.gz | tar xz conftest
+          ./conftest test --policy policy --namespace eval_release_guard evalreport.json
+
+      - name: upload the eval report (keyed by commit SHA)
+        if: always()                        # upload even when the guard blocks —
+        uses: actions/upload-artifact@v4    # the report is how you debug the block
+        with:
+          name: evalreport-${{ github.event.pull_request.head.sha }}
+          path: evalreport.json
+          retention-days: 90
+
+      - name: comment the SCORES on the PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const r = JSON.parse(fs.readFileSync('evalreport.json', 'utf8'));
+            const sha = context.payload.pull_request.head.sha;
+            const pp = (a, b) => (((a - b) * 100 >= 0 ? '+' : '') + ((a - b) * 100).toFixed(1) + 'pp');
+
+            // Lead with the measurement. The diff is nearly useless here: a
+            // three-word change can move a score ten points.
+            const rows = Object.entries(r.quality || {}).map(([k, m]) =>
+              `| ${k} | ${m.baseline.toFixed(3)} | ${m.value.toFixed(3)} | ${pp(m.value, m.baseline)} |`);
+
+            const body = [
+              `### Eval report \`evalreport-${sha.slice(0,7)}\``,
+              '',
+              `model \`${r.model}\` · n=${r.samples} · bundle \`${(r.bundle_hash||'').slice(0,12)}\``,
+              '',
+              '| metric | baseline | this PR | delta |',
+              '|---|---|---|---|',
+              ...rows,
+              '',
+              `**safety** ${r.safety?.passed}/${r.safety?.total}`,
+              `**p95 latency** ${r.performance?.p95_latency_s}s · **cost/1k** $${r.performance?.cost_per_1k_usd}`,
+              '',
+              'The release job ships THIS bundle. If the hash changes, it refuses.'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number, body
+            });

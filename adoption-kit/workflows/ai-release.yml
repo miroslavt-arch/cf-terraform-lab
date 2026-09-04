@@ -1,0 +1,107 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SHIP AN EVALUATED BUNDLE — the AI equivalent of terraform-apply.yml.
+#
+# THE GUARANTEE
+#   This workflow ships the exact bundle that was measured. It re-hashes the
+#   bundle at ship time and refuses if the hash differs from the one recorded
+#   in the eval report.
+#
+#   That is this pipeline's "Error: Saved plan is stale". Without it, someone
+#   tweaks a prompt after the eval passes and you ship something nobody scored.
+#
+#   There is deliberately NO eval step in this workflow. If you add one "just
+#   to be safe", you have removed the guarantee: you would then be shipping a
+#   fresh measurement rather than the approved one.
+#
+# SETUP — Settings → Environments → `ai-prod`
+#   • Required reviewers : who may approve a model-facing release  >>> CHANGE
+#   • Wait timer         : 1 minute
+#   • Environment secret : MODEL_API_KEY_PROD
+# ─────────────────────────────────────────────────────────────────────────────
+name: ai-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_run_id:
+        description: "Run id of the ai-eval-pr workflow that produced the report"
+        required: true
+      sha:
+        description: "Commit SHA the eval report is keyed by"
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  release:
+    name: ship the evaluated bundle (human-gated)
+    runs-on: ubuntu-latest
+    environment: ai-prod                    # >>> CHANGE reviewer + prod key live here
+    env:
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY_PROD }}   # >>> CHANGE
+
+    steps:
+      # Check out the commit the eval measured — not whatever main is now.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: download the EXACT eval report
+        uses: actions/download-artifact@v4
+        with:
+          name: evalreport-${{ inputs.sha }}
+          run-id: ${{ inputs.report_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------------------------------------------------
+      # THE STALE-BUNDLE CHECK. Re-hash what we are about to ship and compare
+      # it to what was evaluated. This is the whole point of the workflow.
+      # -----------------------------------------------------------------------
+      - name: bundle must match what was evaluated
+        run: |
+          set -euo pipefail
+          now=$(cat prompts/**/*.md tools/*.json config/models.yaml \
+                | sha256sum | cut -c1-32)             # >>> CHANGE must match ai-eval-pr
+          evaluated=$(jq -r '.evaluated_bundle_hash // .bundle_hash' evalreport.json)
+
+          echo "evaluated: $evaluated"
+          echo "shipping : $now"
+
+          if [ "$now" != "$evaluated" ]; then
+            echo "::error::BUNDLE MISMATCH. The bundle changed after the eval ran."
+            echo "::error::Re-run the eval on the current commit. Shipping an"
+            echo "::error::unevaluated bundle is what this pipeline exists to prevent."
+            exit 1
+          fi
+          echo "bundle matches the evaluated one"
+
+      # Re-check the policy against the approved report. Cheap, and it stops a
+      # report that failed the guard being dispatched anyway.
+      - name: re-verify the release policy
+        run: |
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.69.0/conftest_0.69.0_Linux_x86_64.tar.gz | tar xz conftest
+          ./conftest test --policy policy --namespace eval_release_guard evalreport.json
+
+      - name: ship
+        # >>> CHANGE to however you deploy: push to a prompt registry, bump a
+        # config map, tag a release. The point is that everything shipped here
+        # came out of the evaluated bundle.
+        run: python deploy/ship_bundle.py --sha "${{ inputs.sha }}"
+
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "## Released \`${{ inputs.sha }}\`"
+            echo ""
+            echo "- report: \`evalreport-${{ inputs.sha }}\` from run ${{ inputs.report_run_id }}"
+            echo "- model: \`$(jq -r .model evalreport.json)\`"
+            echo "- bundle: \`$(jq -r .bundle_hash evalreport.json)\`"
+            echo "- approved by: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# MODEL DRIFT — the pattern that matters most in the AI half.
+#
+# THE PROBLEM IT SOLVES
+#   Your AI system can get worse while nobody touches it. Four ways, none of
+#   which produce a commit:
+#
+#     1. the provider updated the model behind an undated alias
+#     2. your retrieval corpus changed
+#     3. a tool the agent calls changed its response shape or latency
+#     4. your input distribution shifted — the model didn't change, users did
+#
+#   So: freeze an eval set, pin the model, re-run nightly, compare to a
+#   recorded baseline.
+#
+# CALIBRATE BEFORE YOU TRUST IT
+#   A nightly eval has run-to-run variance. Establish your noise floor FIRST:
+#   run this unchanged for a week against the same pin and see how much the
+#   score moves on its own. Set DRIFT_THRESHOLD_PP above that.
+#
+#   A drift job that cries wolf is ignored within two weeks. Same failure mode
+#   as the infrastructure version, arriving faster because here the noise is
+#   real rather than imagined.
+# ─────────────────────────────────────────────────────────────────────────────
+name: ai-drift
+
+on:
+  schedule:
+    - cron: "23 4 * * *"                    # >>> CHANGE nightly, off the hour
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write                             # to raise an issue on drift
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. HAS QUALITY MOVED?
+  # ---------------------------------------------------------------------------
+  drift:
+    name: drift (${{ matrix.suite }})
+    strategy:
+      fail-fast: false                      # one drifted suite must not hide others
+      matrix:
+        suite: [core]                       # >>> CHANGE e.g. [core, rag, agent]
+    runs-on: ubuntu-latest
+    environment: ai-eval                    # budget-capped key: this runs nightly
+    env:
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY_BUDGET_CAPPED }}
+      MODEL_ID: ${{ vars.MODEL_PIN }}       # >>> CHANGE the dated snapshot
+      SAMPLES: "200"
+      DRIFT_THRESHOLD_PP: "2.0"             # >>> CHANGE set above your noise floor
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+
+      - name: re-run the frozen eval set against the pinned model
+        id: run
+        run: |
+          set +e
+          python eval/run.py \
+            --evalset eval/evalset.yaml \
+            --model "$MODEL_ID" \
+            --samples "$SAMPLES" \
+            --baseline eval/baseline.json \
+            --fail-below-pp "$DRIFT_THRESHOLD_PP" \
+            --out drift.json
+          code=$?
+          set -e
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          # Mirror terraform's -detailed-exitcode convention on purpose:
+          #   0 = clean   1 = the RUN broke   2 = quality moved
+          case $code in
+            0) echo "no drift" ;;
+            1) echo "::error::the eval RUN failed — this is not drift, it is a broken harness"; exit 1 ;;
+            2) echo "::warning::QUALITY DRIFT DETECTED" ;;
+          esac
+
+      - name: which cases regressed
+        if: steps.run.outputs.exitcode == '2'
+        # Diff PER CASE, not just the aggregate. An aggregate that fell two
+        # points because one category collapsed is a completely different
+        # problem from one that fell two points evenly.
+        run: |
+          {
+            echo "## Drift in \`${{ matrix.suite }}\`"
+            echo ""
+            echo "model \`$MODEL_ID\` · n=$SAMPLES · threshold ${DRIFT_THRESHOLD_PP}pp"
+            echo ""
+            echo "| case | baseline | today | delta |"
+            echo "|---|---|---|---|"
+            jq -r '.cases[] | select(.delta_pp < -0.001)
+                   | "| \(.id) | \(.baseline) | \(.value) | \(.delta_pp)pp |"' drift.json
+            echo ""
+            echo "Nothing in this repo changed. Check, in order:"
+            echo "1. did the provider update the model behind this pin?"
+            echo "2. did the retrieval corpus change?"
+            echo "3. did a tool's response shape or latency change?"
+            echo "4. did the input distribution shift?"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: fail on drift
+        if: steps.run.outputs.exitcode == '2'
+        run: |
+          echo "::error::QUALITY DRIFT in ${{ matrix.suite }} — see the job summary"
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # 2. IS THE MODEL STILL THERE?
+  #
+  # A separate check, because it is a separate failure. Pinning a dated
+  # snapshot protects you from silent updates — and pinned snapshots get
+  # retired on a published schedule. This turns "the model disappeared on
+  # Tuesday" into weeks of warning.
+  # ---------------------------------------------------------------------------
+  deprecation-watch:
+    name: are the pinned models still available?
+    runs-on: ubuntu-latest
+    environment: ai-eval
+    env:
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY_BUDGET_CAPPED }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: one minimal call per pinned model
+        run: |
+          set -euo pipefail
+          fail=0
+          # >>> CHANGE: list every model id you pin anywhere, including judges.
+          for model in $(yq -r '.models[].id' config/models.yaml); do
+            echo "checking $model"
+            # >>> CHANGE to your provider's smallest possible call.
+            code=$(curl -s -o /tmp/resp.json -w '%{http_code}' \
+              -H "Authorization: Bearer $MODEL_API_KEY" \
+              -H "content-type: application/json" \
+              -d "{\"model\":\"$model\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}" \
+              https://api.example.com/v1/messages)          # >>> CHANGE endpoint
+
+            if [ "$code" = "404" ] || [ "$code" = "410" ]; then
+              echo "::error::$model returns $code — RETIRED. Migrate now."
+              fail=1
+            elif [ "$code" != "200" ]; then
+              echo "::warning::$model returned $code"
+            fi
+
+            # Providers often announce sunsets in a header or the body long
+            # before the 404. That notice is the whole value of this job.
+            if grep -qi "deprecat\|sunset\|retire" /tmp/resp.json 2>/dev/null; then
+              echo "::warning::$model carries a deprecation notice — plan the migration"
+            fi
+          done
+          exit $fail
