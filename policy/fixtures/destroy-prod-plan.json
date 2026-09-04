@@ -1,0 +1,14 @@
+{
+  "//": "DELIBERATELY DANGEROUS fixture. A synthetic `terraform show -json` plan that destroys a record with no lab- marker. Used to demonstrate that policy/destroy_guard.rego actually fires. conftest MUST fail on this file.",
+  "resource_changes": [
+    {
+      "address": "cloudflare_dns_record.production_www",
+      "type": "cloudflare_dns_record",
+      "change": {
+        "actions": ["delete"],
+        "before": { "name": "www.customer-prod.com", "comment": "" },
+        "after": null
+      }
+    }
+  ]
+}
