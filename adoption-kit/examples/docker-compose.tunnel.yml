@@ -1,0 +1,26 @@
+# TWO CONNECTORS, ONE TUNNEL. This is the whole HA story.
+#
+# Both replicas use the SAME tunnel token, so they register as two connectors
+# on one tunnel and the edge balances across them. Stop one:
+#
+#   docker compose stop connector-a
+#
+# and traffic keeps flowing through connector-b with no config change and no
+# DNS change. That is the demo worth running in front of people.
+services:
+  connector-a:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    # No ports published. The connection is OUTBOUND only — that is the point.
+
+  connector-b:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+
+  # The internal service being published. Not reachable from the internet
+  # except through the tunnel.
+  origin:
+    image: nginx:alpine
+    restart: unless-stopped

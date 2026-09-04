@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DRIFT DETECTION — find out when reality stops matching your code, on a
+# schedule, without anyone having to remember.
+#
+# THE MECHANISM
+#   `terraform plan -detailed-exitcode` returns three distinct codes:
+#
+#       0  clean — code and reality agree
+#       1  error — the plan itself failed
+#       2  DRIFT — the world moved
+#
+#   Exit 2 is the whole trick. It is the one you put on a cron.
+#
+# WHY A SCHEDULE AND NOT A PR CHECK
+#   Drift does not happen when you push. It happens at 2am during an outage,
+#   when someone with dashboard access fixes something by hand. A check that
+#   only runs when you change code will never see it.
+#
+# READ-ONLY ON PURPOSE
+#   This uses the plan credential. Noticing that something is wrong should
+#   never require the ability to change it.
+#
+# TWO MODES — pick the one that matches your setup
+#   A) You have remote state  -> use the `plan` step as written. Simplest.
+#   B) You have no remote state on the runner -> use the IMPORT-AND-COMPARE
+#      variant at the bottom of this file.
+# ─────────────────────────────────────────────────────────────────────────────
+name: drift-detection
+
+on:
+  schedule:
+    - cron: "17 3 * * *"                  # >>> CHANGE 03:17 UTC nightly.
+                                          # Avoid :00 — every cron on earth
+                                          # fires then and runners queue.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Which environment root to check"
+        required: false
+        default: "prod"
+
+permissions:
+  contents: read
+  issues: write                           # to raise an issue on drift
+
+env:
+  TF_VERSION: "1.15.8"                    # >>> CHANGE
+
+jobs:
+  drift:
+    # ONE ENTRY PER ENVIRONMENT. Adding staging is a one-line change here,
+    # not a whole new job. fail-fast:false so one drifted env does not hide
+    # drift in the others.
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [prod]               # >>> CHANGE e.g. [prod, staging]
+
+    name: drift (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    environment: plan                     # read-only credential
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PROVIDER_TOKEN_READONLY }}   # >>> CHANGE
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false        # REQUIRED: we need the raw exit code
+
+      - name: plan with detailed exit code
+        id: plan
+        working-directory: infra/envs/${{ matrix.environment }}   # >>> CHANGE
+        run: |
+          terraform init -input=false
+
+          # -detailed-exitcode makes `plan` a three-state check.
+          # -refresh-only asks "did the WORLD change", separate from
+          # "did the CODE change". Drop it if you want both signals together.
+          set +e
+          terraform plan -input=false -no-color -detailed-exitcode \
+            -refresh-only -out=drift.tfplan
+          code=$?
+          set -e
+
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          case $code in
+            0) echo "no drift" ;;
+            1) echo "::error::plan FAILED (this is not drift, it is a broken plan)"; exit 1 ;;
+            2) echo "::warning::DRIFT DETECTED" ;;
+          esac
+
+      - name: render what drifted
+        if: steps.plan.outputs.exitcode == '2'
+        working-directory: infra/envs/${{ matrix.environment }}
+        run: |
+          terraform show -json drift.tfplan > drift.json
+          {
+            echo "## Drift in \`${{ matrix.environment }}\`"
+            echo ""
+            # resource_drift is what changed OUTSIDE terraform. This is the
+            # field you want; resource_changes also contains code changes.
+            jq -r '.resource_drift[]? |
+              "- `\(.address)` — \(.change.actions | join(","))"' drift.json
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # OPTIONAL: attribute the change to a human via your provider's audit log.
+      # Needs a token with audit-log read. Comment out if you do not have one.
+      - name: attribute the change
+        if: steps.plan.outputs.exitcode == '2'
+        continue-on-error: true            # attribution failing must not hide detection
+        working-directory: infra/envs/${{ matrix.environment }}
+        env:
+          AUDIT_TOKEN: ${{ secrets.PROVIDER_AUDIT_TOKEN }}          # >>> CHANGE
+          ACCOUNT_ID: ${{ vars.PROVIDER_ACCOUNT_ID }}               # >>> CHANGE
+        run: python ../../../scripts/drift_report.py drift.json --hours 24 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Fail loudly. A drift job that goes green-with-a-warning gets ignored
+      # within two weeks.
+      - name: fail on drift
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          echo "::error::DRIFT in ${{ matrix.environment }} — see the job summary"
+          exit 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VARIANT B — NO REMOTE STATE ON THE RUNNER
+#
+# If the runner cannot reach your state backend, you cannot compare against
+# "the state at last apply". You can do something arguably better: IMPORT the
+# live objects into an ephemeral state and compare them to the code as
+# committed. Anything the plan proposes beyond the import itself is drift.
+#
+#   - name: import and compare
+#     run: |
+#       terraform init -input=false
+#       terraform plan -input=false -no-color \
+#         -var "resource_id=${{ steps.ids.outputs.resource_id }}" \
+#         -out=drift.tfplan
+#       terraform show -json drift.tfplan > drift.json
+#       n=$(jq '[.resource_changes[]?
+#                | select(.change.actions
+#                | (index("update") or index("create") or index("delete")))]
+#               | length' drift.json)
+#       echo "drifted resources: $n"
+#       [ "$n" = "0" ] || exit 1
+#
+# The root module for this needs an `import` block for each object you are
+# checking. See adoption-kit/examples/import-and-compare.tf
+# ─────────────────────────────────────────────────────────────────────────────

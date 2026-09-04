@@ -1,0 +1,100 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# APPLY A PINNED PLAN — the human gate.
+#
+# WHAT IT GIVES YOU
+#   The write credential does not exist anywhere your code can reach it. It
+#   lives inside a GitHub environment with a required reviewer. A job is not
+#   handed that environment until a named human approves, so the credential is
+#   unreachable from unreviewed code by construction rather than by policy.
+#
+#   And this workflow contains NO `terraform plan` command. It downloads the
+#   artifact terraform-pr.yml produced and runs `terraform apply <planfile>`.
+#   It is structurally incapable of applying something a reviewer did not see.
+#
+# THE INVARIANT YOU GET FOR FREE
+#   If the world moved between plan and apply, Terraform itself refuses:
+#
+#       Error: Saved plan is stale
+#
+#   That is the tool enforcing it, not your process. Process can be skipped.
+#
+# SETUP — GitHub → Settings → Environments → New environment → `apply`
+#   • Required reviewers  : the humans allowed to approve  >>> CHANGE
+#   • Wait timer          : 1 minute. Long enough to say "wait, stop"
+#   • Environment secret  : PROVIDER_TOKEN_WRITE
+#   Do NOT put the write token in repo-level secrets. The whole point is that
+#   it is scoped to this environment.
+# ─────────────────────────────────────────────────────────────────────────────
+name: terraform-apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      plan_run_id:
+        description: "Run id of the terraform-pr workflow that produced the plan"
+        required: true
+      sha:
+        description: "Commit SHA the plan artifact is keyed by"
+        required: true
+
+permissions:
+  contents: read
+  actions: read                           # to download another run's artifact
+
+env:
+  TF_VERSION: "1.15.8"                    # >>> CHANGE must match terraform-pr
+  WORKING_DIR: infra/envs/prod            # >>> CHANGE must match terraform-pr
+
+jobs:
+  apply:
+    name: apply pinned plan (human-gated)
+    runs-on: ubuntu-latest
+
+    # ↓ This one line is the gate. Reviewer + timer + the write secret all
+    #   live on the environment, not in this file.
+    environment: apply                    # >>> CHANGE to your environment name
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PROVIDER_TOKEN_WRITE }}   # >>> CHANGE
+
+    steps:
+      # Check out the code the plan was MADE FROM, not whatever main is now.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: download the EXACT plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.sha }}
+          run-id: ${{ inputs.plan_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ env.WORKING_DIR }}/
+
+      - name: init
+        run: terraform init -input=false
+
+      # NOTE: `apply <planfile>`. There is deliberately no `plan` step in this
+      # workflow. If you add one "just to be safe", you have removed the entire
+      # guarantee this file exists to provide.
+      - name: apply the pinned plan
+        run: terraform apply -input=false "plan-${{ inputs.sha }}.tfplan"
+
+      - name: summary
+        if: always()
+        run: |
+          {
+            echo "## Applied \`${{ inputs.sha }}\`"
+            echo ""
+            echo "Plan artifact: \`tfplan-${{ inputs.sha }}\`"
+            echo "From run: ${{ inputs.plan_run_id }}"
+            echo "Approved by: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"

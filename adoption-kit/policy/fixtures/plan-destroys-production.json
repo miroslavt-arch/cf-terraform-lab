@@ -1,0 +1,9 @@
+{
+  "//": "Known-BAD fixture. conftest MUST fail on this. Used by the meta-test in terraform-pr.yml.",
+  "resource_changes": [
+    { "address": "cloudflare_dns_record.www", "type": "cloudflare_dns_record",
+      "change": { "actions": ["delete"], "before": { "name": "www.example.com" }, "after": null } },
+    { "address": "aws_db_instance.main", "type": "aws_db_instance",
+      "change": { "actions": ["delete","create"], "before": { "name": "orders-db" }, "after": {} } }
+  ]
+}

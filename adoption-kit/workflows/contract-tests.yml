@@ -1,0 +1,95 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# TIER-TWO CONTRACT TESTS — the ones that DO touch the real API.
+#
+# THE TWO-TIER MODEL
+#   Tier one (in terraform-pr.yml): mocked provider, no credentials, ~1 second,
+#   runs on every push. Catches logic, ordering, validation, composition.
+#
+#   Tier two (this file): real provider, real API, real resources — created
+#   with a reserved prefix and destroyed automatically when the run ends.
+#   Catches the things a mock cannot: does the API actually accept this shape,
+#   does it canonicalise my input, does the round-trip survive.
+#
+#   Tier two runs NIGHTLY and on demand. Never on PRs. If it ran on PRs it
+#   would be slow and flaky and people would learn to ignore it.
+#
+# THE HONEST TENSION — worth understanding before you adopt this
+#   These tests need a WRITE credential. If your write credential lives behind
+#   a human gate (terraform-apply.yml), then a scheduled run of this workflow
+#   will QUEUE FOR APPROVAL rather than running unattended overnight.
+#
+#   That is a real conflict, not an oversight: unattended write automation and
+#   a human gate on writes pull in opposite directions. Resolve it by giving CI
+#   its OWN narrowly-scoped credential — one that can only touch resources
+#   matching the test prefix — rather than by removing the gate.
+#
+#   Two options:
+#     A) environment: apply     -> safe, but scheduled runs wait for a human
+#     B) environment: ci-tests  -> a separate environment holding a credential
+#                                  scoped to `tftest-*` only, no reviewer.
+#   B is what you want in the end. A is where everyone starts.
+# ─────────────────────────────────────────────────────────────────────────────
+name: contract-tests
+
+on:
+  schedule:
+    - cron: "42 2 * * *"                  # >>> CHANGE nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.15.8"                    # >>> CHANGE
+  TEST_DIR: tests/contract                # >>> CHANGE
+
+jobs:
+  contract:
+    name: contract tests (real API, tftest- prefix, auto-destroyed)
+    runs-on: ubuntu-latest
+    environment: ci-tests                 # >>> CHANGE see the note above
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PROVIDER_TOKEN_SCOPED }}  # >>> CHANGE
+      # Test fixtures need to know where to build. Pass them as TF_VAR_*.
+      TF_VAR_contract_zone_id:   ${{ vars.TEST_ZONE_ID }}         # >>> CHANGE
+      TF_VAR_contract_zone_name: ${{ vars.TEST_ZONE_NAME }}       # >>> CHANGE
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: run contract tests
+        run: |
+          # -test-directory on INIT as well as TEST.
+          #
+          # THIS IS A REAL TRAP: a plain `terraform init` does NOT install
+          # modules referenced from a non-default test directory. The suite
+          # then dies at run time with "Module not installed", which reads
+          # like a broken test rather than a missing init flag.
+          terraform init -backend=false -input=false -test-directory="${TEST_DIR}"
+          terraform test -test-directory="${TEST_DIR}"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WRITING THE TESTS — two gotchas that cost real time
+#
+# 1. DECLARE YOUR VARIABLES IN THE TEST FILE.
+#    If a .tftest.hcl references var.foo without declaring it, Terraform parses
+#    the TF_VAR_foo value as an HCL EXPRESSION rather than a string. A value
+#    like "my-zone.example.com" then fails with:
+#
+#        Error: Extra characters after expression
+#
+#    which tells you nothing. Terraform warns that this is deprecated and will
+#    become an error. So always:
+#
+#        variable "contract_zone_name" { type = string }
+#
+# 2. RESERVE A PREFIX AND NEVER VARY IT.
+#    Every resource a contract test creates must carry a prefix that your
+#    destroy-guard policy recognises as disposable — `tftest-` in this kit.
+#    That prefix is what makes auto-destroy safe to allow.
+#
+# See adoption-kit/examples/contract-test.tftest.hcl for a working file.
+# ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,10 @@
+# GOOD fragment. Passes policy. One file per team kills merge conflicts on the
+# shared object, and CODEOWNERS routes this file's review to the app team.
+team: app
+owner: app-team@example.com
+review_date: "2026-08-14"
+rules:
+  - ref: app_log_beta
+    description: "Log traffic to the beta path for rollout observability"
+    expression: 'http.host eq "__HOST__" and starts_with(http.request.uri.path, "/beta")'
+    action: log

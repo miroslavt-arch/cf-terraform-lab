@@ -1,0 +1,174 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PLAN ON PULL REQUEST — the read-only half of the gated pipeline.
+#
+# WHAT IT GIVES YOU
+#   Every PR gets: offline unit tests, formatting, policy lint, a real plan
+#   produced with a token that CANNOT WRITE, a destroy-guard over the plan, and
+#   the plan saved as an artifact keyed by commit SHA.
+#
+#   The apply workflow (terraform-apply.yml) later replays THAT ARTIFACT. It
+#   never re-plans. So what a reviewer approves is byte-for-byte what executes.
+#
+# BEFORE YOU USE THIS — three things to set up
+#   1. A GitHub environment named `plan` holding a READ-ONLY provider token.
+#      No protection rules needed: planning is safe by token construction.
+#   2. A GitHub environment named `apply` holding the WRITE token, with
+#      "Required reviewers" set. See terraform-apply.yml.
+#   3. Repo variables: TF_WORKING_DIR (e.g. infra/envs/prod).
+#
+# EVERY LINE YOU MUST CHANGE IS MARKED  # >>> CHANGE
+# ─────────────────────────────────────────────────────────────────────────────
+name: terraform-pr
+
+on:
+  pull_request:
+    branches: [main]                      # >>> CHANGE if your trunk differs
+
+permissions:
+  contents: read
+  pull-requests: write                    # needed to comment the plan
+
+# One run per branch. A new push cancels the previous plan rather than racing it.
+concurrency:
+  group: terraform-pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  TF_VERSION: "1.15.8"                    # >>> CHANGE pin to your version
+  WORKING_DIR: infra/envs/prod            # >>> CHANGE your root module
+  CONFTEST_VERSION: "0.69.0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # TIER ONE TESTS — offline, mocked provider, no credentials at all.
+  # Fast enough (~1s) that nobody is tempted to skip it.
+  # ---------------------------------------------------------------------------
+  unit:
+    name: unit tests (offline, no credentials)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false        # we want raw exit codes
+
+      - name: formatting
+        run: terraform fmt -check -recursive
+
+      - name: unit tests
+        # -backend=false: never touch remote state to run a mocked test.
+        run: |
+          terraform init -backend=false -input=false
+          terraform test
+
+  # ---------------------------------------------------------------------------
+  # POLICY LINT — your organisation's rules, as code, over the source files.
+  # Delete this job if you are not using OPA/conftest yet.
+  # ---------------------------------------------------------------------------
+  policy:
+    name: policy lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install conftest
+        run: |
+          curl -sL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" | tar xz conftest
+          sudo mv conftest /usr/local/bin/
+
+      - name: sources must pass policy
+        run: conftest test --policy policy config/            # >>> CHANGE paths
+
+      # META-TEST. Runs the policy against a file you KNOW is bad and fails the
+      # build if it passes. A lint that has quietly stopped linting is worse
+      # than no lint, because you trust it.
+      - name: known-bad fixture must FAIL policy
+        run: |
+          if conftest test --policy policy policy/fixtures/known-bad.yaml; then
+            echo "::error::the known-bad fixture PASSED policy — the lint is broken"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # PLAN — with a token that cannot write. This is the important part.
+  # ---------------------------------------------------------------------------
+  plan:
+    name: plan (read-only credential)
+    needs: [unit, policy]                 # no plan until the cheap checks pass
+    runs-on: ubuntu-latest
+    environment: plan                     # >>> CHANGE holds the READ-ONLY token
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    env:
+      # >>> CHANGE to your provider's credential variables.
+      # The whole design rests on this being a read-only credential.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PROVIDER_TOKEN_READONLY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: init
+        run: terraform init -input=false
+
+      - name: plan
+        id: plan
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+          terraform plan -input=false -no-color -out="plan-${SHA}.tfplan" | tee plan.txt
+          terraform show -json "plan-${SHA}.tfplan" > plan.json
+
+      # ---------------------------------------------------------------------
+      # DESTROY GUARD — the rule that stands between a pipeline and a bad day.
+      # Reads the plan JSON, finds every delete, and refuses the ones that are
+      # not explicitly permitted. See policy/destroy_guard.rego.
+      # ---------------------------------------------------------------------
+      - name: destroy guard
+        run: |
+          curl -sL "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" | tar xz conftest
+          ./conftest test --policy "${GITHUB_WORKSPACE}/policy" --namespace destroy_guard plan.json
+
+      # ---------------------------------------------------------------------
+      # THE ARTIFACT. Named by commit SHA — this name IS the contract between
+      # this workflow and the apply workflow.
+      # ---------------------------------------------------------------------
+      - name: upload plan artifact (keyed by commit SHA)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ env.WORKING_DIR }}/plan-${{ github.event.pull_request.head.sha }}.tfplan
+            ${{ env.WORKING_DIR }}/plan.txt
+          retention-days: 30              # >>> CHANGE to your retention policy
+
+      - name: comment the plan on the PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const dir = process.env.WORKING_DIR;
+            const plan = fs.readFileSync(`${dir}/plan.txt`, 'utf8');
+            // GitHub comments cap at 65536 chars; keep the tail, which holds
+            // the summary line people actually read.
+            const tail = plan.length > 60000 ? plan.slice(-60000) : plan;
+            const sha = context.payload.pull_request.head.sha;
+            const body = [
+              `### Terraform plan for \`${sha.slice(0,7)}\``,
+              '',
+              'Planned with the **read-only** credential.',
+              `Artifact: \`tfplan-${sha}\` — the apply job replays THIS file, not a re-plan.`,
+              '',
+              '<details><summary>plan output</summary>',
+              '', '```', tail, '```',
+              '</details>'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });
