@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+zone_id   = "0000000000000000000000000000beef"
+zone_name = "sandbox.example.com"
+
+# Must match disposable_prefixes in policy/destroy_guard.rego.
+resource_prefix = "tf-"
+subdomain       = "sandbox"

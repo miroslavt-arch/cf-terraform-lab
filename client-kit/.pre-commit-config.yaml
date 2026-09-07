@@ -1,0 +1,45 @@
+# Catch things on the laptop, in seconds, before they are anyone else's
+# problem. Install once:
+#
+#   pip install pre-commit && pre-commit install
+#
+repos:
+  # Secrets first. Git history is forever: a token that lands in a commit has
+  # to be rotated even after you remove it.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+
+  - repo: local
+    hooks:
+      - id: terraform-fmt
+        name: terraform fmt
+        entry: terraform fmt -check -recursive
+        language: system
+        pass_filenames: false
+        files: \.(tf|tftest\.hcl)$
+
+      # State and tfvars must never be committed, even if .gitignore is edited.
+      - id: forbid-state-files
+        name: forbid tfstate / tfvars
+        entry: bash -c 'git diff --cached --name-only | grep -E "\.tfstate|\.tfvars$" && { echo "state or tfvars staged - refusing"; exit 1; } || exit 0'
+        language: system
+        pass_filenames: false
+
+      # Policy runs here too, not just in CI. Same check, one layer earlier.
+      - id: conftest-fragments
+        name: conftest on policy fixtures
+        entry: bash -c 'command -v conftest >/dev/null || exit 0; conftest test --policy policy --namespace destroy_guard policy/fixtures/plan-allowed.json'
+        language: system
+        pass_filenames: false

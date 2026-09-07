@@ -1,0 +1,36 @@
+# ── State: NEVER commit ──────────────────────────────────────────────────────
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl.bak
+crash.log
+crash.*.log
+
+# ── Variable files may carry real ids; only the example is tracked ───────────
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# ── Plans can embed sensitive values ────────────────────────────────────────
+*.tfplan
+plan.json
+plan.txt
+
+# ── Credentials ─────────────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*credentials*
+
+# ── Eval artifacts ──────────────────────────────────────────────────────────
+evalreport.json
+drift.json
+
+# ── Editor / OS ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+__pycache__/
+.pytest_cache/

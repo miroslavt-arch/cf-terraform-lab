@@ -1,0 +1,16 @@
+# EVERY model id used anywhere, in one file.
+#
+# Pin DATED SNAPSHOTS, never bare aliases. An alias points at whatever the
+# provider ships next, which means your eval measured one model and production
+# may serve another. The deprecation-watch job in ai-drift.yml reads this file.
+models:
+  - id: <provider-model-2025-01-01>   # >>> CHANGE to a real dated snapshot
+    role: primary
+    notes: the model under test
+
+  - id: <provider-judge-2025-01-01>   # >>> CHANGE
+    role: judge
+    notes: >
+      Pinned SEPARATELY from the primary. A judge whose behaviour moved will
+      report clean scores while quality falls, which is the worst failure mode
+      because it is silent and it is in your instrumentation.

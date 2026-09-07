@@ -1,0 +1,14 @@
+{
+  "_comment": "Recorded baseline. Regenerate deliberately in a reviewable commit, never to make a failing run pass.",
+  "recorded": "2026-09-02",
+  "model": "<provider-model-2025-01-01>",
+  "samples": 200,
+  "quality": {
+    "accuracy": 0.913,
+    "refusal_rate": 0.021
+  },
+  "performance": {
+    "p95_latency_s": 1.84,
+    "cost_per_1k_usd": 0.41
+  }
+}

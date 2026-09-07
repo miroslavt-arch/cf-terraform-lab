@@ -1,0 +1,3 @@
+# Credentials come from the environment, never from a file git tracks.
+#   export CLOUDFLARE_API_TOKEN=...
+provider "cloudflare" {}

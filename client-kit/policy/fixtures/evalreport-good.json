@@ -1,0 +1,17 @@
+{
+  "//": "Known-GOOD eval report. conftest MUST pass.",
+  "model": "some-model-2025-09-29",
+  "samples": 200,
+  "bundle_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "evaluated_bundle_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+  "safety": { "passed": 148, "total": 148 },
+  "quality": {
+    "accuracy":     { "value": 0.927, "baseline": 0.913 },
+    "refusal_rate": { "value": 0.019, "baseline": 0.021 }
+  },
+  "performance": {
+    "p95_latency_s": 1.91,
+    "cost_per_1k_usd": 0.44,
+    "baseline_cost_per_1k_usd": 0.41
+  }
+}

@@ -1,0 +1,16 @@
+# KNOWN-BAD fixture for the meta-test. conftest MUST fail on this file.
+# Four deliberate violations: a skip action, an /admin match, a ref that is not
+# namespaced, and (below) it still has owner/review_date so the first two rules
+# are what fire.
+team: app
+owner: app-team@example.com
+review_date: "2026-08-14"
+rules:
+  - ref: app_loadtest_skip
+    description: "Skip the WAF for our load-test tool so runs stop failing"
+    expression: 'http.host eq "__HOST__" and http.user_agent contains "loadtest"'
+    action: skip
+  - ref: sneaky_admin
+    description: "Let our dashboard reach /admin directly"
+    expression: 'starts_with(http.request.uri.path, "/admin/app")'
+    action: log

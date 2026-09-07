@@ -1,0 +1,92 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# A FROZEN EVAL SET.
+#
+# "Frozen" is the important word. Once you record a baseline against this file,
+# changing it invalidates every comparison you have. Add cases in a reviewable
+# commit and re-baseline deliberately — never edit a case to make a run pass.
+#
+# FIFTY REAL CASES BEAT FIVE HUNDRED SYNTHETIC ONES. Sample from production.
+# Synthetic cases test the distribution you imagined, which is not the one you
+# have.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: 3
+description: Support-ticket classifier — frozen 2026-09-02
+
+# Sampling config. Every case runs n times because output is not guaranteed
+# identical across calls, even at temperature 0. n=1 is an anecdote.
+sampling:
+  n: 200
+  temperature: 0.0
+  # Recorded so a drift run reproduces the conditions exactly. If you change
+  # any of these, you are measuring something else.
+  max_tokens: 512
+
+# How each case is scored. Keep scoring mechanical where you can — an exact
+# match or a regex is reproducible; a judge is another model that can drift.
+scorers:
+  - id: exact_label
+    type: exact_match
+    field: label
+
+  - id: cited_source
+    type: regex
+    pattern: '\[source:[a-z0-9-]+\]'
+
+  # LLM-as-judge: useful, and a dependency like any other.
+  #   • pin the judge SEPARATELY from the model under test
+  #   • hold out a human-labelled subset to check the judge itself
+  # A judge whose behaviour moved reports clean scores while quality falls —
+  # the worst failure mode, because it is silent and it is in your instruments.
+  - id: helpfulness
+    type: llm_judge
+    judge_model: <pinned-judge-snapshot-id>   # >>> CHANGE
+    rubric: eval/rubrics/helpfulness.md
+    holdout_labels: eval/rubrics/human_labels.jsonl
+
+cases:
+  - id: billing-refund-001
+    input: |
+      I was charged twice for my subscription this month. Order #44812.
+    expect:
+      label: billing.duplicate_charge
+    scorers: [exact_label]
+
+  - id: outage-report-014
+    input: |
+      Your API has been returning 503s for the last twenty minutes from eu-west.
+    expect:
+      label: incident.availability
+    scorers: [exact_label]
+
+  # Ambiguous on purpose. Real traffic contains cases where reasonable people
+  # disagree, and an eval set with none of them overstates your accuracy.
+  - id: ambiguous-mixed-011
+    input: |
+      The invoice is wrong AND the dashboard won't load. Which do I report?
+    expect:
+      label: billing.invoice_error
+    notes: >
+      Genuinely ambiguous. Kept because it is representative, not because the
+      label is obviously right. If a change flips this one, that is worth a
+      conversation rather than an automatic pass or fail.
+    scorers: [exact_label]
+
+  - id: citation-required-003
+    input: |
+      What is your refund window for annual plans?
+    expect:
+      contains_citation: true
+    scorers: [cited_source, helpfulness]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HOLDOUT — never tune against this.
+#
+# You will tune against `cases` whether you mean to or not: you will look at
+# failures and adjust. That is fine, and it is also how a set stops measuring
+# anything. Keep a holdout you look at rarely.
+#
+# When your main score jumps a lot and the holdout does not move, suspect
+# contamination before celebrating.
+# ─────────────────────────────────────────────────────────────────────────────
+holdout: eval/holdout.yaml

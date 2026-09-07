@@ -1,0 +1,17 @@
+{
+  "name": "lookup_order",
+  "description": "Look up an order by its id. Use when the ticket mentions an order number. The description is how the model decides whether to call this, so an empty or vague one silently disables the tool.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "order_id": {
+        "type": "string",
+        "description": "The order id, e.g. 44812"
+      }
+    },
+    "required": [
+      "order_id"
+    ],
+    "additionalProperties": false
+  }
+}

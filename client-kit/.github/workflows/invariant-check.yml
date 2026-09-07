@@ -1,0 +1,91 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# INVARIANT CHECK — "is the emergency thing still switched on?"
+#
+# THE PROBLEM THIS SOLVES
+#   Every team is good at arming emergency controls. Nobody is good at
+#   disarming them. The incident ends at 4am, everyone goes to bed, and a
+#   challenge / block / maintenance mode stays on production for three weeks
+#   until a customer complains.
+#
+#   The same shape covers a lot of ground:
+#     • an incident WAF rule left enabled
+#     • a maintenance page still served
+#     • a feature flag left forced
+#     • a firewall rule opened "just for the migration"
+#     • debug logging left at TRACE
+#
+# WHY IT QUERIES THE API AND NOT YOUR CODE
+#   This asks the PROVIDER what is true right now. It does not read your
+#   tfvars, because tfvars describe intent, and intent is exactly what is
+#   wrong when someone armed something by hand.
+#
+# WHY IT FAILS RATHER THAN WARNS
+#   A failing scheduled workflow emails the repo owner and shows a red X on the
+#   Actions tab. A warning is invisible. And because it runs hourly, it keeps
+#   nagging until somebody disarms — the nag is the feature.
+#
+# SUCCESS IS SILENT. You will only ever hear from this workflow when it matters.
+# ─────────────────────────────────────────────────────────────────────────────
+name: invariant-check
+
+on:
+  schedule:
+    - cron: "0 * * * *"                   # hourly. >>> CHANGE if too noisy
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: is anything still armed?
+    runs-on: ubuntu-latest
+    environment: plan                     # read-only is enough to ASK
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PROVIDER_TOKEN_READONLY }}  # >>> CHANGE
+      ZONE_ID: ${{ vars.ZONE_ID }}                                  # >>> CHANGE
+      # Rules whose ref starts with this are "emergency" rules that must be
+      # disabled in peacetime.
+      EMERGENCY_PREFIX: "ir_"                                       # >>> CHANGE
+
+    steps:
+      - name: query the live ruleset
+        run: |
+          set -euo pipefail
+
+          # >>> CHANGE this whole block for your provider / your invariant.
+          # The SHAPE is what matters: ask the API, extract the live state,
+          # compare to what peacetime should look like, exit non-zero if not.
+
+          ruleset=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets?per_page=50" \
+            | jq -r '.result[] | select(.name=="waf-composed") | .id')
+
+          if [ -z "$ruleset" ]; then
+            echo "no composed ruleset deployed — nothing to check"
+            exit 0
+          fi
+
+          armed=$(curl -sf -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/rulesets/${ruleset}" \
+            | jq -r --arg p "$EMERGENCY_PREFIX" \
+              '[.result.rules[]
+                | select((.ref // "" | startswith($p)) and .enabled == true)
+                | .ref] | join(", ")')
+
+          if [ -n "$armed" ]; then
+            echo "::error::STILL ARMED: [$armed]"
+            {
+              echo "## Emergency controls still armed"
+              echo ""
+              echo "The following are enabled and should not be in peacetime:"
+              echo ""
+              echo "$armed" | tr ',' '\n' | sed 's/^/- `/;s/$/`/'
+              echo ""
+              echo "If the incident is over, disarm them. This check runs hourly"
+              echo "and will keep failing until they are off."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "all clear — no emergency controls armed, as peacetime should be"
