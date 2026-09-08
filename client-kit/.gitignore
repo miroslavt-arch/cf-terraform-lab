@@ -2,7 +2,15 @@
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl.bak
+
+# The provider lock is ignored HERE because this kit is a template: you will
+# replace the provider, and our lock file would just be hashes you delete.
+#
+# In YOUR repo, do the opposite — commit .terraform.lock.hcl. It is how every
+# machine and every CI runner gets identical provider versions, and a version
+# skew between a laptop and a runner produces plan differences that look
+# exactly like drift.
+.terraform.lock.hcl
 crash.log
 crash.*.log
 

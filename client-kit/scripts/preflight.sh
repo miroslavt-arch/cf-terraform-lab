@@ -24,8 +24,7 @@ section "TOOLS"
 
 need_tool() { # need_tool <cmd> <why> <required|optional>
   if command -v "$1" >/dev/null 2>&1; then
-    green "$1 ($($1 --version 2>&1 | head -1 | tr -d "
-" | cut -c1-46))"
+    green "$1 ($($1 --version 2>&1 | head -1 | cut -c1-46))"
   elif [ "${3:-required}" = "optional" ]; then
     yellow "$1 not found — $2"
   else
